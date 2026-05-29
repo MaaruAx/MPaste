@@ -26,16 +26,6 @@
 
 <br>
 
-[![downloads](https://img.shields.io/gitea/downloads/release/USER/mpaste?gitea_url=https%3A%2F%2Fcodeberg.org&style=flat-square&label=downloads&color=f5c842&labelColor=1a1a2e)](https://codeberg.org/USER/mpaste/releases)
-&nbsp;
-[![stars](https://img.shields.io/gitea/stars/USER/mpaste?gitea_url=https%3A%2F%2Fcodeberg.org&style=flat-square&label=stars&color=f5c842&labelColor=1a1a2e)](https://codeberg.org/USER/mpaste)
-&nbsp;
-[![issues](https://img.shields.io/gitea/issues/open/USER/mpaste?gitea_url=https%3A%2F%2Fcodeberg.org&style=flat-square&label=open%20issues&color=333&labelColor=1a1a2e)](https://codeberg.org/USER/mpaste/issues)
-&nbsp;
-[![last commit](https://img.shields.io/gitea/last-commit/USER/mpaste?gitea_url=https%3A%2F%2Fcodeberg.org&style=flat-square&label=last%20commit&color=555&labelColor=1a1a2e)](https://codeberg.org/USER/mpaste/commits/branch/main)
-
-<br>
-
 > ⚠️ **Early access release.** Bugs are expected and features are actively being added. Your feedback directly shapes what gets built next — see how to reach us below.
 
 <br>
