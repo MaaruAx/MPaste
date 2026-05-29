@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@900&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ──────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+
+/* ── CSS vars (tema por defecto) ─────────────────────────────────────── */
+:root {
+  --accent:   #f5c842;
+  --accent-h: #f2bf35;
+  --accent-a: #f5c84220;
+  --bg:       #0a0a0a;
+  --surf:     #111111;
+  --border:   #2a2a2a;
+  --text:     #f0f0f0;
+  --muted:    #333333;
+  --muted2:   #555555;
+  --ok:       #5ce07a;
+  --warn:     #f5c842;
+  --err:      #e05c5c;
+}
+
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  background-image: radial-gradient(circle, #ffffff08 1px, transparent 1px);
+  background-size: 20px 20px;
+  font-family: 'Segoe UI', sans-serif;
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Drag nativo WebView2 (sin JS, sin lag) ──────────────────────────── */
+.topbar {
+  -webkit-app-region: drag;
+  display: flex; align-items: center;
+  padding: 0 10px; height: 40px; min-height: 40px;
+  background: var(--surf); border-bottom: 2px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Los elementos clickeables dentro del topbar deben cancelar el drag */
+.topbar-right { -webkit-app-region: no-drag; display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+.logo {
+  font-family: 'Barlow', Impact, sans-serif; font-weight: 900;
+  font-size: 16px; letter-spacing: .04em; text-transform: uppercase; line-height: 1;
+}
+.logo em { color: var(--accent); font-style: normal; }
+.logo-sub { font-size: 7px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-top: 3px; }
+
+/* Gear y close comparten estilo */
+.icon-btn {
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; border-radius: 2px;
+  transition: color .12s, background .12s;
+  font-size: 11px;
+}
+.icon-btn.gear  { color: #2a2a2a; }
+.icon-btn.gear:hover  { color: var(--muted2); background: #ffffff08; }
+.icon-btn.close { color: #2a2a2a; font-size: 13px; }
+.icon-btn.close:hover { color: var(--err); background: #e05c5c1a; }
+
+/* ── Botones ─────────────────────────────────────────────────────────── */
+.btn-area {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; gap: 7px; padding: 11px;
+}
+
+.mm-btn {
+  border: 2px solid var(--border); border-radius: 3px;
+  padding: 8px 12px 7px; cursor: pointer; background: var(--surf);
+  transition: background .1s, border-color .1s;
+  -webkit-app-region: no-drag;
+}
+.mm-btn:hover  { background: #161616; border-color: #353535; }
+.mm-btn:active { background: #0e0e0e; }
+.mm-btn.primary { background: var(--accent); border-color: var(--accent); }
+.mm-btn.primary:hover  { background: var(--accent-h); border-color: var(--accent-h); }
+.mm-btn.primary:active { filter: brightness(.92); }
+
+.btn-label {
+  display: block;
+  font-family: 'Barlow', Impact, sans-serif; font-weight: 900;
+  font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text); line-height: 1;
+}
+.mm-btn.primary .btn-label { color: #000; }
+
+.btn-sub {
+  display: block; font-size: 8px; color: #383838;
+  text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; line-height: 1;
+}
+.mm-btn.primary .btn-sub { color: #00000050; }
+
+.mm-btn.loading { opacity: .4; pointer-events: none; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+.mm-btn.loading .btn-label { animation: blink .8s ease infinite; }
+
+/* ── Status bar ──────────────────────────────────────────────────────── */
+.statusbar {
+  display: flex; align-items: center; gap: 7px;
+  height: 24px; min-height: 24px;
+  background: var(--surf); border-top: 2px solid var(--border);
+  padding: 0 10px; flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+.dot { width: 5px; height: 5px; border-radius: 50%; background: #252525; flex-shrink: 0; transition: background .25s; }
+.stxt {
+  font-size: 8px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: #2e2e2e; transition: color .25s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;
+}
+
+/* ── Settings panel ─────────────────────────────────────────────────── */
+.settings-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+.settings-overlay.open { display: flex; }
+
+.settings-panel {
+  background: var(--surf);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  width: 228px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sp-header {
+  background: #0d0d0d;
+  border-bottom: 2px solid var(--border);
+  padding: 9px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sp-title {
+  font-family: 'Barlow', Impact, sans-serif; font-weight: 900;
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text);
+}
+.sp-close {
+  color: var(--muted2); font-size: 13px; cursor: pointer; line-height: 1;
+  transition: color .12s;
+}
+.sp-close:hover { color: var(--err); }
+
+.sp-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.sp-row { display: flex; flex-direction: column; gap: 4px; }
+.sp-lbl {
+  font-size: 7px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent);
+  display: flex; align-items: center; gap: 6px;
+}
+.sp-lbl::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Swatches de acento */
+.swatches { display: flex; gap: 5px; flex-wrap: wrap; }
+.swatch {
+  width: 18px; height: 18px; border-radius: 2px;
+  border: 2px solid transparent; cursor: pointer;
+  transition: border-color .12s, transform .1s;
+}
+.swatch:hover    { transform: scale(1.15); }
+.swatch.active   { border-color: var(--text); }
+
+/* Select de idioma */
+.sp-select {
+  background: #0d0d0d; border: 2px solid var(--border); border-radius: 3px;
+  color: var(--text); font-family: 'Segoe UI', sans-serif;
+  font-size: 10px; padding: 4px 8px; width: 100%; cursor: pointer;
+  appearance: none; outline: none;
+}
+.sp-select:focus { border-color: var(--accent); }
+
+/* Temas de fondo */
+.theme-btns { display: flex; gap: 5px; }
+.theme-btn {
+  flex: 1; padding: 5px 0; text-align: center;
+  font-size: 8px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border: 2px solid var(--border); border-radius: 3px;
+  cursor: pointer; background: #0d0d0d; color: var(--muted2);
+  transition: border-color .1s, color .1s;
+}
+.theme-btn:hover { border-color: #444; color: var(--text); }
+.theme-btn.active { border-color: var(--accent); color: var(--accent); }
+
+.sp-footer {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end;
+}
+.sp-save {
+  background: var(--accent); color: #000;
+  border: none; border-radius: 3px;
+  padding: 5px 16px;
+  font-family: 'Barlow', Impact, sans-serif; font-weight: 900;
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  cursor: pointer; transition: filter .1s;
+}
+.sp-save:hover  { filter: brightness(.92); }
+.sp-save:active { filter: brightness(.85); }
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ───────────────────────────────────────────────────────── -->
+<div class="topbar" id="topbar">
+  <div>
+    <div class="logo"><em>M</em>PASTE</div>
+    <div class="logo-sub" id="logoSub">for DaVinci Resolve</div>
+  </div>
+  <div class="topbar-right">
+    <div class="icon-btn gear" id="gearBtn" title="Settings">&#9881;</div>
+    <div class="icon-btn close" id="closeBtn">&#x2715;</div>
+  </div>
+</div>
+
+<!-- ── Buttons ──────────────────────────────────────────────────────── -->
+<div class="btn-area">
+  <div class="mm-btn" id="copyBtn" data-action="copy">
+    <span class="btn-label" id="lblCopy">COPIAR</span>
+    <span class="btn-sub"  id="subCopy">frame del cabezal &rarr; portapapeles</span>
+  </div>
+  <div class="mm-btn primary" id="pasteBtn" data-action="paste">
+    <span class="btn-label" id="lblPaste">PEGAR</span>
+    <span class="btn-sub"  id="subPaste">portapapeles &rarr; cabezal de la timeline</span>
+  </div>
+</div>
+
+<!-- ── Status bar ───────────────────────────────────────────────────── -->
+<div class="statusbar">
+  <div class="dot" id="dot"></div>
+  <span class="stxt" id="stxt">Listo</span>
+</div>
+
+<!-- ── Settings overlay ─────────────────────────────────────────────── -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="sp-header">
+      <span class="sp-title" id="spTitle">Ajustes</span>
+      <span class="sp-close" id="spClose">&#x2715;</span>
+    </div>
+    <div class="sp-body">
+
+      <!-- Acento -->
+      <div class="sp-row">
+        <div class="sp-lbl" id="spLblAccent">Acento</div>
+        <div class="swatches" id="swatches">
+          <div class="swatch active" data-color="#f5c842" style="background:#f5c842"></div>
+          <div class="swatch" data-color="#5ce07a"  style="background:#5ce07a"></div>
+          <div class="swatch" data-color="#5d8ef0"  style="background:#5d8ef0"></div>
+          <div class="swatch" data-color="#e05c5c"  style="background:#e05c5c"></div>
+          <div class="swatch" data-color="#c77dff"  style="background:#c77dff"></div>
+          <div class="swatch" data-color="#ff9f43"  style="background:#ff9f43"></div>
+          <div class="swatch" data-color="#f0f0f0"  style="background:#f0f0f0"></div>
+        </div>
+      </div>
+
+      <!-- Tema de fondo -->
+      <div class="sp-row">
+        <div class="sp-lbl" id="spLblTheme">Tema</div>
+        <div class="theme-btns">
+          <div class="theme-btn active" data-theme="dark"  id="spThemeDark">Dark</div>
+          <div class="theme-btn"        data-theme="amoled" id="spThemeAmoled">AMOLED</div>
+          <div class="theme-btn"        data-theme="dim"   id="spThemeDim">Dim</div>
+        </div>
+      </div>
+
+      <!-- Idioma -->
+      <div class="sp-row">
+        <div class="sp-lbl" id="spLblLang">Idioma</div>
+        <select class="sp-select" id="langSelect">
+          <option value="es">Espanol</option>
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="hg">Hinglish</option>
+        </select>
+      </div>
+
+    </div>
+    <div class="sp-footer">
+      <button class="sp-save" id="spSave">GUARDAR</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────
+const THEMES = {
+  dark:  { bg: '#0a0a0a', surf: '#111111', border: '#2a2a2a' },
+  amoled:{ bg: '#000000', surf: '#0a0a0a', border: '#1a1a1a' },
+  dim:   { bg: '#18181f', surf: '#1e1e28', border: '#2e2e3e' },
+};
+
+const I18N = {
+  es: {
+    logoSub:   'for DaVinci Resolve',
+    lblCopy:   'COPIAR',
+    subCopy:   'frame del cabezal \u2192 portapapeles',
+    lblPaste:  'PEGAR',
+    subPaste:  'portapapeles \u2192 cabezal de la timeline',
+    ready:     'Listo',
+    copying:   'Capturando frame...',
+    pasting:   'Procesando...',
+    errUnexp:  'Error inesperado',
+    spTitle:   'Ajustes',
+    spAccent:  'Acento',
+    spTheme:   'Tema',
+    spLang:    'Idioma',
+    spSave:    'GUARDAR',
+    tdark:     'Dark', tamoled: 'AMOLED', tdim: 'Dim',
+  },
+  en: {
+    logoSub:   'for DaVinci Resolve',
+    lblCopy:   'COPY',
+    subCopy:   'playhead frame \u2192 clipboard',
+    lblPaste:  'PASTE',
+    subPaste:  'clipboard \u2192 playhead on timeline',
+    ready:     'Ready',
+    copying:   'Capturing frame...',
+    pasting:   'Processing...',
+    errUnexp:  'Unexpected error',
+    spTitle:   'Settings',
+    spAccent:  'Accent',
+    spTheme:   'Theme',
+    spLang:    'Language',
+    spSave:    'SAVE',
+    tdark:     'Dark', tamoled: 'AMOLED', tdim: 'Dim',
+  },
+  hi: {
+    logoSub:   'DaVinci Resolve ke liye',
+    lblCopy:   '\u0915\u0949\u092a\u0940',
+    subCopy:   '\u092a\u094d\u0932\u0947\u0939\u0947\u0921 \u092b\u094d\u0930\u0947\u092e \u2192 \u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921',
+    lblPaste:  '\u092a\u0947\u0938\u094d\u091f',
+    subPaste:  '\u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921 \u2192 \u091f\u093e\u0907\u092e\u0932\u093e\u0907\u0928 \u092a\u094d\u0932\u0947\u0939\u0947\u0921',
+    ready:     '\u0924\u0948\u092f\u093e\u0930',
+    copying:   '\u092b\u094d\u0930\u0947\u092e \u0915\u0948\u092a\u094d\u091a\u0930...',
+    pasting:   '\u092a\u094d\u0930\u094b\u0938\u0947\u0938\u093f\u0902\u0917...',
+    errUnexp:  '\u0905\u092a\u094d\u0930\u0924\u094d\u092f\u093e\u0936\u093f\u0924 \u0924\u094d\u0930\u0941\u091f\u093f',
+    spTitle:   '\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938',
+    spAccent:  '\u0930\u0902\u0917',
+    spTheme:   '\u0925\u0940\u092e',
+    spLang:    '\u092d\u093e\u0937\u093e',
+    spSave:    '\u0938\u0939\u0947\u091c\u0947\u0902',
+    tdark: 'Dark', tamoled: 'AMOLED', tdim: 'Dim',
+  },
+  hg: {
+    logoSub:   'DaVinci Resolve ke liye',
+    lblCopy:   'COPY KARO',
+    subCopy:   'playhead frame \u2192 clipboard',
+    lblPaste:  'PASTE KARO',
+    subPaste:  'clipboard \u2192 timeline playhead',
+    ready:     'Taiyaar',
+    copying:   'Frame capture ho raha hai...',
+    pasting:   'Processing ho raha hai...',
+    errUnexp:  'Unexpected error aa gaya',
+    spTitle:   'Settings',
+    spAccent:  'Accent color',
+    spTheme:   'Theme',
+    spLang:    'Language / Bhasha',
+    spSave:    'SAVE KARO',
+    tdark: 'Dark', tamoled: 'AMOLED', tdim: 'Dim',
+  },
+};
+
+// ── Cargar settings desde Python ──────────────────────────────────────
+let settings = { accent: '#f5c842', theme: 'dark', lang: 'es' };
+let t = I18N.es;
+
+async function loadSettings() {
+  try {
+    const s = await pywebview.api.get_settings();
+    settings = s;
+    applySettings(false);
+  } catch(_) {}
+}
+
+function applySettings(save) {
+  t = I18N[settings.lang] || I18N.es;
+  const th = THEMES[settings.theme] || THEMES.dark;
+  const r = document.documentElement.style;
+
+  // Vars de color
+  r.setProperty('--accent',   settings.accent);
+  r.setProperty('--accent-h', _lighten(settings.accent, -15));
+  r.setProperty('--accent-a', settings.accent + '20');
+  r.setProperty('--bg',       th.bg);
+  r.setProperty('--surf',     th.surf);
+  r.setProperty('--border',   th.border);
+
+  // Textos
+  document.getElementById('logoSub').textContent  = t.logoSub;
+  document.getElementById('lblCopy').textContent  = t.lblCopy;
+  document.getElementById('subCopy').textContent  = t.subCopy;
+  document.getElementById('lblPaste').textContent = t.lblPaste;
+  document.getElementById('subPaste').textContent = t.subPaste;
+  document.getElementById('spTitle').textContent  = t.spTitle;
+  document.getElementById('spLblAccent').childNodes[0].textContent = t.spAccent + ' ';
+  document.getElementById('spLblTheme').childNodes[0].textContent  = t.spTheme  + ' ';
+  document.getElementById('spLblLang').childNodes[0].textContent   = t.spLang   + ' ';
+  document.getElementById('spSave').textContent   = t.spSave;
+  document.getElementById('spThemeDark').textContent   = t.tdark;
+  document.getElementById('spThemeAmoled').textContent = t.tamoled;
+  document.getElementById('spThemeDim').textContent    = t.tdim;
+  setStatus(t.ready, '');
+
+  // Sync UI del panel
+  document.querySelectorAll('.swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.color === settings.accent);
+  });
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === settings.theme);
+  });
+  document.getElementById('langSelect').value = settings.lang;
+
+  if (save) {
+    pywebview.api.save_settings(settings).catch(() => {});
+  }
+}
+
+function _lighten(hex, pct) {
+  try {
+    let n = parseInt(hex.slice(1), 16);
+    let r = Math.max(0, Math.min(255, (n>>16) + pct));
+    let g = Math.max(0, Math.min(255, ((n>>8)&0xff) + pct));
+    let b = Math.max(0, Math.min(255, (n&0xff) + pct));
+    return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  } catch(_) { return hex; }
+}
+
+// ── Status ────────────────────────────────────────────────────────────
+const dot  = document.getElementById('dot');
+const stxt = document.getElementById('stxt');
+const CLR  = { ok:'var(--ok)', warn:'var(--warn)', error:'var(--err)', info:'#555' };
+
+function setStatus(msg, level) {
+  const c = CLR[level] || '#252525';
+  dot.style.background  = level ? (CLR[level] || '#252525') : '#252525';
+  stxt.style.color = level ? (CLR[level] || '#2e2e2e') : '#2e2e2e';
+  stxt.textContent = msg ? msg.toUpperCase() : '';
+}
+
+function setLoading(btn, on) { btn.classList.toggle('loading', on); }
+
+// ── Acciones de botones ───────────────────────────────────────────────
+const COPY = document.getElementById('copyBtn');
+const PSTE = document.getElementById('pasteBtn');
+
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn || btn.classList.contains('loading')) return;
+  if (btn.dataset.action === 'copy')  doCopy();
+  if (btn.dataset.action === 'paste') doPaste();
+});
+
+document.getElementById('closeBtn').addEventListener('click', function() {
+  pywebview.api.close();
+});
+
+function doCopy() {
+  setStatus(t.copying, 'info');
+  setLoading(COPY, true);
+  pywebview.api.copy_frame()
+    .then(function(r) { setLoading(COPY, false); setStatus(r.msg, r.level); })
+    .catch(function()  { setLoading(COPY, false); setStatus(t.errUnexp, 'error'); });
+}
+
+function doPaste() {
+  setStatus(t.pasting, 'info');
+  setLoading(PSTE, true);
+  pywebview.api.paste_image()
+    .then(function(r) { setLoading(PSTE, false); setStatus(r.msg, r.level); })
+    .catch(function()  { setLoading(PSTE, false); setStatus(t.errUnexp, 'error'); });
+}
+
+// ── Settings panel ────────────────────────────────────────────────────
+const overlay = document.getElementById('settingsOverlay');
+
+document.getElementById('gearBtn').addEventListener('click', function() {
+  overlay.classList.add('open');
+});
+document.getElementById('spClose').addEventListener('click', function() {
+  overlay.classList.remove('open');
+});
+overlay.addEventListener('click', function(e) {
+  if (e.target === overlay) overlay.classList.remove('open');
+});
+
+// Swatches
+document.getElementById('swatches').addEventListener('click', function(e) {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  sw.classList.add('active');
+  settings.accent = sw.dataset.color;
+});
+
+// Theme buttons
+document.querySelectorAll('.theme-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    settings.theme = btn.dataset.theme;
+  });
+});
+
+// Guardar
+document.getElementById('spSave').addEventListener('click', function() {
+  settings.lang = document.getElementById('langSelect').value;
+  applySettings(true);
+  overlay.classList.remove('open');
+});
+
+// ── Init ──────────────────────────────────────────────────────────────
+window.addEventListener('pywebviewready', loadSettings);
+</script>
+</body>
+</html>
