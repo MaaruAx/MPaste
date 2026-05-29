@@ -172,9 +172,9 @@ pip install cairosvg
 
 ![oss](https://img.shields.io/badge/Free_&_Open_Source-1a1a2e?style=for-the-badge)
 &nbsp;
-[![discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/YOURLINK)
+[![discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dvZ9nvN79Y)
 &nbsp;
-[![releases](https://img.shields.io/badge/Releases-f5c842?style=for-the-badge&labelColor=1a1a2e)](https://codeberg.org/USER/mpaste/releases)
+[![releases](https://img.shields.io/badge/Releases-f5c842?style=for-the-badge&labelColor=1a1a2e)](https://codeberg.org/MaaruAx/MPaste/releases)
 
 <br>
 <sub>Part of the MMarket ecosystem. Built for the DaVinci Resolve community.</sub>
