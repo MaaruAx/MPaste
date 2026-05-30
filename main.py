@@ -9,49 +9,61 @@ MMarket/Apps/MPaste/
 import sys
 import os
 
+_IS_FROZEN  = getattr(sys, "frozen", False)          # True cuando empaquetado con PyInstaller
+_BUNDLE_DIR = getattr(sys, "_MEIPASS", None)          # Carpeta temporal de PyInstaller (archivos embebidos)
+
 _GUARD = "MPASTE_STARTED"
 if os.environ.get(_GUARD) != "1":
     os.environ[_GUARD] = "1"
-    try:
-        import ctypes
-        _hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if _hwnd and _hwnd != 0:
-            _is_store = "WindowsApps" in sys.executable
-            if not _is_store:
-                _pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-                if os.path.isfile(_pyw):
-                    import subprocess as _sp
-                    _sp.Popen(
-                        [_pyw] + sys.argv,
-                        creationflags=0x08000000,
-                        close_fds=True,
-                        env={**os.environ, _GUARD: "1"},
-                    )
-                    sys.exit(0)
-            ctypes.windll.user32.ShowWindow(_hwnd, 0)
-    except SystemExit:
-        raise
-    except Exception:
-        pass
+    # Cuando es .exe (PyInstaller con --noconsole) no hay consola que ocultar.
+    # El bloque solo aplica cuando se ejecuta como .py normal.
+    if not _IS_FROZEN:
+        try:
+            import ctypes
+            _hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if _hwnd and _hwnd != 0:
+                _is_store = "WindowsApps" in sys.executable
+                if not _is_store:
+                    _pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+                    if os.path.isfile(_pyw):
+                        import subprocess as _sp
+                        _sp.Popen(
+                            [_pyw] + sys.argv,
+                            creationflags=0x08000000,
+                            close_fds=True,
+                            env={**os.environ, _GUARD: "1"},
+                        )
+                        sys.exit(0)
+                ctypes.windll.user32.ShowWindow(_hwnd, 0)
+        except SystemExit:
+            raise
+        except Exception:
+            pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BLOQUE 1 — Rutas base
 # ══════════════════════════════════════════════════════════════════════════════
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Cuando es .exe frozen: __file__ no existe o apunta a sys._MEIPASS.
+# _SCRIPT_DIR = donde vive el .exe (para escribir Lua, leer settings, etc.)
+# _BUNDLE_DIR = donde PyInstaller extrae los archivos embebidos (ui.html, etc.)
+if _IS_FROZEN:
+    _SCRIPT_DIR = os.path.dirname(sys.executable)
+    _BUNDLE_DIR = _BUNDLE_DIR or _SCRIPT_DIR
+else:
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    _BUNDLE_DIR = _SCRIPT_DIR
 _APPDATA    = os.path.expandvars("%APPDATA%")
 
-# Carpeta segura principal
-INSTALL_DIR = os.path.join(_APPDATA, "MMarket", "Apps", "MPaste")
-IMAGES_DIR  = os.path.join(INSTALL_DIR, "images")
-CACHE_FILE  = os.path.join(INSTALL_DIR, "deps_cache.json")
+INSTALL_DIR   = os.path.join(_APPDATA, "MMarket", "Apps", "MPaste")
+IMAGES_DIR    = os.path.join(INSTALL_DIR, "images")
+CACHE_FILE    = os.path.join(INSTALL_DIR, "deps_cache.json")
 SETTINGS_FILE = os.path.join(INSTALL_DIR, "settings.json")
 
-# ui.html: primero buscar en carpeta segura, luego junto al script
 _UI_INSTALLED = os.path.join(INSTALL_DIR, "ui.html")
+_UI_BUNDLE    = os.path.join(_BUNDLE_DIR, "ui.html")   # embebido en el .exe
 _UI_LOCAL     = os.path.join(_SCRIPT_DIR, "ui.html")
 
-# Rutas de Resolve para el script Lua
 _RESOLVE_SCRIPTS = [
     os.path.join(_APPDATA, "Blackmagic Design", "DaVinci Resolve", "Support",
                  "Fusion", "Scripts", "Utility"),
@@ -92,35 +104,38 @@ import shutil
 _FIRST_RUN_FLAG = os.path.join(INSTALL_DIR, ".initialized")
 
 def _do_first_run():
-    """
-    Copia main.py y ui.html a la carpeta segura e instala el script Lua
-    en el workspace de Resolve para poder abrir MPaste desde el menu Scripts.
-    """
-    # Copiar archivos del programa a la carpeta segura
-    for fname in ("main.py", "ui.html"):
-        src = os.path.join(_SCRIPT_DIR, fname)
-        dst = os.path.join(INSTALL_DIR, fname)
-        if os.path.isfile(src) and not os.path.isfile(dst):
-            try:
-                shutil.copy2(src, dst)
-            except Exception:
-                pass
+    if not _IS_FROZEN:
+        # Solo cuando se ejecuta como .py: copia los archivos al directorio de instalacion
+        for fname in ("main.py", "ui.html"):
+            src = os.path.join(_SCRIPT_DIR, fname)
+            dst = os.path.join(INSTALL_DIR, fname)
+            if os.path.isfile(src) and not os.path.isfile(dst):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    pass
 
-    # Crear el script Lua
-    # pythonw_path lo buscamos; si no encontramos, usamos "pythonw"
-    pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    if not os.path.isfile(pyw):
-        pyw = "pythonw"
-    pyw = pyw.replace("\\", "\\\\")
-
-    main_path = os.path.join(INSTALL_DIR, "main.py").replace("\\", "\\\\")
-
-    lua_content = (
-        '-- MPaste launcher para DaVinci Resolve\n'
-        '-- Generado automaticamente por MPaste (MMarket)\n'
-        'local cmd = string.format(\'"' + pyw + '" "' + main_path + '"\')\n'
-        'os.execute(cmd)\n'
-    )
+    if _IS_FROZEN:
+        # .exe: el Lua llama directamente al ejecutable
+        exe_path = sys.executable.replace("\\", "\\\\")
+        lua_content = (
+            '-- MPaste launcher para DaVinci Resolve\n'
+            '-- Generado automaticamente por MPaste (MMarket)\n'
+            'local cmd = string.format(\'"' + exe_path + '"\')\n'
+            'os.execute(cmd)\n'
+        )
+    else:
+        pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+        if not os.path.isfile(pyw):
+            pyw = "pythonw"
+        pyw = pyw.replace("\\", "\\\\")
+        main_path = os.path.join(INSTALL_DIR, "main.py").replace("\\", "\\\\")
+        lua_content = (
+            '-- MPaste launcher para DaVinci Resolve\n'
+            '-- Generado automaticamente por MPaste (MMarket)\n'
+            'local cmd = string.format(\'"' + pyw + '" "' + main_path + '"\')\n'
+            'os.execute(cmd)\n'
+        )
 
     for scripts_dir in _RESOLVE_SCRIPTS:
         try:
@@ -129,11 +144,10 @@ def _do_first_run():
             if not os.path.isfile(lua_path):
                 with open(lua_path, "w", encoding="utf-8") as f:
                     f.write(lua_content)
-            break   # escribir solo en la primera ruta que funcione
+            break
         except Exception:
             continue
 
-    # Marcar como inicializado
     try:
         with open(_FIRST_RUN_FLAG, "w") as f:
             f.write("1")
@@ -143,7 +157,6 @@ def _do_first_run():
 if not os.path.isfile(_FIRST_RUN_FLAG):
     _do_first_run()
 else:
-    # En arranques posteriores: actualizar solo ui.html si cambio
     for fname in ("ui.html",):
         src = os.path.join(_SCRIPT_DIR, fname)
         dst = os.path.join(INSTALL_DIR, fname)
@@ -156,8 +169,12 @@ else:
         except Exception:
             pass
 
-# Resolver cual ui.html usar (instalado tiene prioridad)
-UI_FILE = _UI_INSTALLED if os.path.isfile(_UI_INSTALLED) else _UI_LOCAL
+if _IS_FROZEN:
+    # Frozen: preferir el embebido en el bundle, luego el instalado
+    UI_FILE = _UI_BUNDLE if os.path.isfile(_UI_BUNDLE) else _UI_INSTALLED
+else:
+    # .py: preferir el instalado (para recibir updates), luego el local
+    UI_FILE = _UI_INSTALLED if os.path.isfile(_UI_INSTALLED) else _UI_LOCAL
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -366,7 +383,7 @@ def _get_resolve():
     except ImportError:
         raise RuntimeError(
             "DaVinciResolveScript no encontrado.\n"
-            "El scripting API funciona en Resolve Free y Studio."
+            "MPaste requiere DaVinci Resolve Studio."
         )
     try:
         resolve = dvr.scriptapp("Resolve")
@@ -411,7 +428,6 @@ def _playhead_record_frame(tl, fps):
 
 
 def _get_still_duration(proj):
-    """Duracion de imagen estatica configurada en el proyecto (frames)."""
     try:
         d = proj.GetSetting("stillsDuration")
         if d:
@@ -488,50 +504,53 @@ def _save_image(img):
     return None
 
 
-def _insert_at_playhead(mp, tl, clip, record_frame, still_dur):
+def _append_clip(mp, clip):
     """
-    Intenta insertar el clip exactamente en el frame del cabezal.
-
-    Resolve 20 Free: AppendToTimeline con recordFrame funciona si la pista
-    tiene espacio. Si la posicion esta ocupada, Resolve NO desplaza clips
-    existentes (eso es comportamiento de Studio con overwrite). En Free la
-    alternativa es usar la pagina Cut con InsertClipIntoTimeline si existe,
-    o mover el cabezal a espacio libre.
-
-    Estrategia en capas:
-      1. AppendToTimeline con recordFrame y duracion correcta
-      2. AppendToTimeline sin recordFrame (append al final)
-    El clip siempre llega al Media Pool independientemente.
+    Agrega una imagen estatica a la timeline activa.
+    Para stills NO se usan startFrame/endFrame: Resolve aplica
+    automaticamente su configuracion de duracion de imagenes.
     """
-    # Capa 1: recordFrame con duracion correcta
+    # Forma 1 — minima: Resolve maneja la duracion (la mas confiable para stills)
     try:
-        result = mp.AppendToTimeline([{
+        r = mp.AppendToTimeline([clip])
+        if r:
+            return True
+    except Exception:
+        pass
+
+    # Forma 2 — dict sin frames
+    try:
+        r = mp.AppendToTimeline([{"mediaPoolItem": clip, "mediaType": 1}])
+        if r:
+            return True
+    except Exception:
+        pass
+
+    # Forma 3 — dict con frame 0->0 (un solo frame, siempre valido para stills)
+    try:
+        r = mp.AppendToTimeline([{
             "mediaPoolItem": clip,
             "startFrame":    0,
-            "endFrame":      max(0, still_dur - 1),
+            "endFrame":      0,
             "mediaType":     1,
-            "recordFrame":   record_frame,
         }])
-        if result:
-            return True, "cabezal"
+        if r:
+            return True
     except Exception:
         pass
 
-    # Capa 2: append al final (siempre funciona)
-    try:
-        result = mp.AppendToTimeline([clip])
-        if result:
-            return True, "final"
-    except Exception:
-        pass
-
-    return False, "fallo"
+    return False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BLOQUE 6 — API para JavaScript
 # ══════════════════════════════════════════════════════════════════════════════
-_DEFAULT_SETTINGS = {"accent": "#f5c842", "theme": "dark", "lang": "es"}
+_DEFAULT_SETTINGS = {
+    "accent":       "#f5c842",
+    "theme":        "dark",
+    "lang":         "es",
+    "always_on_top": True,
+}
 
 
 class API:
@@ -548,13 +567,44 @@ class API:
     def save_settings(self, data):
         try:
             safe = {
-                "accent": str(data.get("accent", "#f5c842"))[:20],
-                "theme":  str(data.get("theme",  "dark"))[:20],
-                "lang":   str(data.get("lang",   "es"))[:10],
+                "accent":        str(data.get("accent",  "#f5c842"))[:20],
+                "theme":         str(data.get("theme",   "dark"))[:20],
+                "lang":          str(data.get("lang",    "es"))[:10],
+                "always_on_top": bool(data.get("always_on_top", True)),
             }
             return _save_json(SETTINGS_FILE, safe)
         except Exception:
             return False
+
+    def get_system_lang(self):
+        try:
+            import locale
+            lang = locale.getdefaultlocale()[0] or "en"
+            code = lang.split("_")[0].lower()
+            return code if code in ("es", "en", "hi") else "en"
+        except Exception:
+            return "en"
+
+    def set_always_on_top(self, value):
+        try:
+            win = webview.windows[0] if webview.windows else None
+            if win:
+                win.on_top = bool(value)
+            # Persist immediately
+            s = self.get_settings()
+            s["always_on_top"] = bool(value)
+            _save_json(SETTINGS_FILE, s)
+            return True
+        except Exception:
+            return False
+
+    def minimize(self):
+        try:
+            win = webview.windows[0] if webview.windows else None
+            if win:
+                win.minimize()
+        except Exception:
+            pass
 
     def copy_frame(self):
         try:
@@ -574,10 +624,9 @@ class API:
             try: resolve.OpenPage(orig_page)
             except Exception: pass
 
-        # Estrategia 1: GrabStill (Free + Studio)
         try:
             resolve.OpenPage("color")
-            time.sleep(0.5)
+            time.sleep(0.6)           # dar tiempo a que la pagina cargue
             still = tl.GrabStill()
             if still:
                 gallery = proj.GetGallery()
@@ -585,8 +634,14 @@ class API:
                 if album:
                     tmp_dir = tempfile.mkdtemp(prefix="mpaste_")
                     album.ExportStills([still], tmp_dir, "frame", "png")
-                    time.sleep(1.0)
-                    pngs = glob.glob(os.path.join(tmp_dir, "*.png"))
+                    # ExportStills es asincrono: hacer polling hasta que aparezca el archivo
+                    pngs     = []
+                    deadline = time.time() + 12.0   # hasta 12 segundos
+                    while time.time() < deadline:
+                        time.sleep(0.35)
+                        pngs = glob.glob(os.path.join(tmp_dir, "*.png"))
+                        if pngs:
+                            break
                     if pngs:
                         img = Image.open(max(pngs, key=os.path.getmtime)).convert("RGB")
                         _img_to_clipboard(img)
@@ -599,7 +654,6 @@ class API:
 
         _restore()
 
-        # Estrategia 2: archivo fuente si el clip es imagen estatica
         try:
             item    = tl.GetCurrentVideoItem()
             mp_item = item.GetMediaPoolItem() if item else None
@@ -615,6 +669,7 @@ class API:
         return {"level": "warn", "msg": "Abre pagina Color en Resolve e intenta"}
 
     def paste_image(self):
+        # ── 1. Leer portapapeles ──────────────────────────────────────────────
         try:
             img, fmt = _clipboard_to_pil()
         except Exception as e:
@@ -628,15 +683,35 @@ class API:
         except Exception as e:
             return {"level": "error", "msg": f"No se pudo convertir imagen: {e}"}
 
+        # ── 2. Guardar en disco ───────────────────────────────────────────────
         saved_path = _save_image(img)
         if not saved_path:
             return {"level": "error", "msg": "No se pudo guardar la imagen en disco"}
 
+        # ── 3. Conectar a Resolve ─────────────────────────────────────────────
         try:
-            _, proj, tl = _get_resolve()
+            resolve, proj, _ = _get_resolve()
         except RuntimeError as e:
             return {"level": "error", "msg": str(e)}
 
+        # ── 4. Cambiar a pagina Edit ANTES de todo (AppendToTimeline lo necesita)
+        try:
+            cur = resolve.GetCurrentPage() or ""
+            if cur not in ("edit", "cut"):
+                resolve.OpenPage("edit")
+                time.sleep(0.5)
+        except Exception:
+            pass
+
+        # Re-fetch despues del cambio de pagina (los objetos anteriores pueden quedar invalidos)
+        try:
+            pm   = resolve.GetProjectManager()
+            proj = pm.GetCurrentProject()
+            tl   = proj.GetCurrentTimeline() if proj else None
+        except Exception:
+            tl = None
+
+        # ── 5. Importar al Media Pool ─────────────────────────────────────────
         try:
             mp    = proj.GetMediaPool()
             clips = mp.ImportMedia([saved_path])
@@ -654,22 +729,12 @@ class API:
         if not tl:
             return {"level": "warn", "msg": f"En '{bin_name}' (sin timeline activa)"}
 
-        fps = 24.0
-        try:
-            fps = float(tl.GetSetting("timelineFrameRate") or 24)
-        except Exception:
-            pass
+        # ── 6. Agregar a la timeline ──────────────────────────────────────────
+        added = _append_clip(mp, clips[0])
 
-        record_frame = _playhead_record_frame(tl, fps)
-        still_dur    = _get_still_duration(proj)
-
-        ok, where = _insert_at_playhead(mp, tl, clips[0], record_frame, still_dur)
-
-        if ok and where == "cabezal":
-            return {"level": "ok",   "msg": f"Pegado en '{bin_name}' en cabezal"}
-        if ok and where == "final":
-            return {"level": "warn", "msg": f"En '{bin_name}' (agregado al final, cabezal ocupado)"}
-        return {"level": "warn",     "msg": f"En '{bin_name}' (fallo al agregar a timeline)"}
+        if added:
+            return {"level": "ok",  "msg": f"Pegado en '{bin_name}'"}
+        return {"level": "warn",    "msg": f"En '{bin_name}' (no se pudo agregar a timeline)"}
 
     def close(self):
         try:
@@ -684,9 +749,17 @@ class API:
 # ══════════════════════════════════════════════════════════════════════════════
 if not os.path.isfile(UI_FILE):
     _show_fatal(
-        f"No se encontro ui.html en:\n{INSTALL_DIR}\nni en:\n{_SCRIPT_DIR}\n\n"
-        "Asegurate de que main.py y ui.html esten en la misma carpeta."
+        f"No se encontro ui.html.\n\n"
+        f"Buscado en:\n"
+        f"  {_BUNDLE_DIR}\n"
+        f"  {INSTALL_DIR}\n"
+        f"  {_SCRIPT_DIR}\n\n"
+        "Si usas el .exe, asegurate de compilarlo con:\n"
+        "  --add-data \"ui.html;.\""
     )
+
+_settings_on_start = _load_json(SETTINGS_FILE, _DEFAULT_SETTINGS)
+_always_on_top     = bool(_settings_on_start.get("always_on_top", True))
 
 try:
     api    = API()
@@ -700,7 +773,7 @@ try:
         height           = 210,
         resizable        = False,
         frameless        = True,
-        on_top           = True,
+        on_top           = _always_on_top,
         background_color = "#0a0a0a",
         min_size         = (252, 210),
     )
