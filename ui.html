@@ -2,15 +2,31 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@900&display=swap" rel="stylesheet">
 <style>
+/* ── Fuentes locales (cargadas via pywebview.api.get_fonts_base_url) ──────── */
+/* El bloque @font-face se inyecta desde JS una vez que Python devuelve la    */
+/* ruta real de la carpeta fonts/. Mientras tanto se usan los fallbacks.      */
+
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden}
-:root{--accent:#f5c842;--accent-h:#f2bf35;--bg:#0a0a0a;--surf:#111111;--border:#2a2a2a;--text:#f0f0f0;--muted:#333333;--muted2:#555555;--ok:#5ce07a;--warn:#f5c842;--err:#e05c5c}
-body{display:flex;flex-direction:column;background:var(--bg);background-image:radial-gradient(circle,#ffffff08 1px,transparent 1px);background-size:20px 20px;font-family:'Segoe UI',sans-serif;color:var(--text);border:2px solid var(--border);border-radius:4px;user-select:none;-webkit-user-select:none}
+:root{
+  --accent:#f5c842;--accent-h:#f2bf35;
+  --bg:#0a0a0a;--surf:#111111;--border:#2a2a2a;
+  --text:#f0f0f0;--muted:#333333;--muted2:#555555;
+  --ok:#5ce07a;--warn:#f5c842;--err:#e05c5c
+}
+body{
+  display:flex;flex-direction:column;
+  background:var(--bg);
+  background-image:radial-gradient(circle,#ffffff08 1px,transparent 1px);
+  background-size:20px 20px;
+  font-family:'Segoe UI',sans-serif;
+  color:var(--text);
+  border:2px solid var(--border);border-radius:4px;
+  user-select:none;-webkit-user-select:none
+}
 
+/* ── Topbar ──────────────────────────────────────────────────────────────── */
 .topbar{-webkit-app-region:drag;display:flex;align-items:center;padding:0 10px;height:40px;min-height:40px;background:var(--surf);border-bottom:2px solid var(--border);flex-shrink:0}
 .topbar-right{-webkit-app-region:no-drag;display:flex;align-items:center;gap:4px;margin-left:auto}
 .logo{font-family:'Barlow',Impact,sans-serif;font-weight:900;font-size:16px;letter-spacing:.04em;text-transform:uppercase;line-height:1}
@@ -20,7 +36,7 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
 .icon-btn.minimize:hover{color:var(--accent);background:#f5c84218}
 .icon-btn.close:hover{color:var(--err);background:#e05c5c18}
 
-/* Panel */
+/* ── Panel principal ─────────────────────────────────────────────────────── */
 .mode-panel{display:flex;flex:1;flex-direction:column;justify-content:center}
 .btn-area{flex:1;display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 11px;-webkit-app-region:no-drag}
 
@@ -38,11 +54,12 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
 .btn-sub{display:block;font-size:8px;color:#404040;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;line-height:1}
 .mm-btn.primary .btn-sub{color:#00000055}
 
+/* ── Statusbar ───────────────────────────────────────────────────────────── */
 .statusbar{-webkit-app-region:no-drag;display:flex;align-items:center;gap:7px;height:24px;min-height:24px;background:var(--surf);border-top:2px solid var(--border);padding:0 10px;flex-shrink:0}
 .dot{width:5px;height:5px;border-radius:50%;background:#252525;flex-shrink:0;transition:background .25s}
 .stxt{font-size:8px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#2e2e2e;transition:color .25s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
 
-/* Settings */
+/* ── Settings overlay ────────────────────────────────────────────────────── */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:200;-webkit-app-region:no-drag}
 .overlay.open{display:flex}
 .sp{background:var(--surf);border:2px solid var(--border);border-radius:4px;width:220px;max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
@@ -56,10 +73,25 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
 .sp-row{display:flex;flex-direction:column;gap:5px}
 .sp-lbl{font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:5px}
 .sp-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Swatches + campo hex */
+.accent-wrap{display:flex;flex-direction:column;gap:5px}
 .swatches{display:flex;gap:5px;flex-wrap:wrap}
 .swatch{width:18px;height:18px;border-radius:3px;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:border-color .12s,transform .1s}
 .swatch:hover{transform:scale(1.12)}
 .swatch.active{border-color:var(--text)}
+.hex-row{display:flex;gap:5px;align-items:center}
+.hex-prefix{font-size:9px;font-weight:700;color:var(--muted2);font-family:'Barlow',Impact,sans-serif;letter-spacing:.04em;flex-shrink:0}
+.hex-input{
+  flex:1;background:#0d0d0d;border:2px solid var(--border);border-radius:3px;
+  color:var(--text);font-family:'Segoe UI',sans-serif;font-size:10px;
+  padding:3px 6px;outline:none;width:0;text-transform:uppercase;
+  letter-spacing:.08em;transition:border-color .12s
+}
+.hex-input:focus{border-color:var(--accent)}
+.hex-input.invalid{border-color:var(--err)}
+.hex-preview{width:18px;height:18px;border-radius:3px;border:2px solid var(--border);flex-shrink:0;transition:background .1s}
+
 .theme-row{display:flex;gap:4px}
 .theme-btn{flex:1;padding:5px 0;text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:2px solid var(--border);border-radius:3px;cursor:pointer;background:#0d0d0d;color:var(--muted2);transition:border-color .1s,color .1s}
 .theme-btn:hover{border-color:#444;color:var(--text)}
@@ -87,7 +119,6 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
   </div>
 </div>
 
-<!-- IMG Panel -->
 <div class="mode-panel" id="panel-img">
   <div class="btn-area">
     <div class="mm-btn" id="copyBtn" data-action="copy">
@@ -114,33 +145,49 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
       <span class="sp-x" id="spClose">&#x2715;</span>
     </div>
     <div class="sp-body">
+
+      <!-- Acento -->
       <div class="sp-row">
         <div class="sp-lbl" id="spLblAccent">Acento</div>
-        <div class="swatches" id="swatches">
-          <div class="swatch active" data-color="#f5c842" style="background:#f5c842"></div>
-          <div class="swatch" data-color="#5ce07a" style="background:#5ce07a"></div>
-          <div class="swatch" data-color="#5d8ef0" style="background:#5d8ef0"></div>
-          <div class="swatch" data-color="#e05c5c" style="background:#e05c5c"></div>
-          <div class="swatch" data-color="#c77dff" style="background:#c77dff"></div>
-          <div class="swatch" data-color="#ff9f43" style="background:#ff9f43"></div>
-          <div class="swatch" data-color="#f0f0f0" style="background:#f0f0f0"></div>
+        <div class="accent-wrap">
+          <div class="swatches" id="swatches">
+            <div class="swatch" data-color="#f5c842" style="background:#f5c842"></div>
+            <div class="swatch" data-color="#5ce07a" style="background:#5ce07a"></div>
+            <div class="swatch" data-color="#5d8ef0" style="background:#5d8ef0"></div>
+            <div class="swatch" data-color="#e05c5c" style="background:#e05c5c"></div>
+            <div class="swatch" data-color="#c77dff" style="background:#c77dff"></div>
+            <div class="swatch" data-color="#ff9f43" style="background:#ff9f43"></div>
+            <div class="swatch" data-color="#f0f0f0" style="background:#f0f0f0"></div>
+          </div>
+          <!-- Campo hex personalizado -->
+          <div class="hex-row">
+            <span class="hex-prefix">#</span>
+            <input class="hex-input" id="hexInput" maxlength="6" placeholder="f5c842" spellcheck="false">
+            <div class="hex-preview" id="hexPreview"></div>
+          </div>
         </div>
       </div>
+
+      <!-- Tema -->
       <div class="sp-row">
         <div class="sp-lbl" id="spLblTheme">Tema</div>
         <div class="theme-row">
-          <div class="theme-btn active" data-theme="dark">Dark</div>
+          <div class="theme-btn" data-theme="dark">Dark</div>
           <div class="theme-btn" data-theme="amoled">AMOLED</div>
           <div class="theme-btn" data-theme="dim">Dim</div>
         </div>
       </div>
+
+      <!-- Always on Top -->
       <div class="sp-row">
         <div class="sp-lbl" id="spLblAot">Always on Top</div>
         <div class="theme-row">
-          <div class="theme-btn active" id="aotOn">On</div>
+          <div class="theme-btn" id="aotOn">On</div>
           <div class="theme-btn" id="aotOff">Off</div>
         </div>
       </div>
+
+      <!-- Idioma -->
       <div class="sp-row">
         <div class="sp-lbl" id="spLblLang">Idioma</div>
         <select class="sp-select" id="langSel">
@@ -150,6 +197,7 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
           <option value="hg">Hinglish</option>
         </select>
       </div>
+
     </div>
     <div class="sp-footer">
       <button class="sp-save" id="spSave">GUARDAR</button>
@@ -158,99 +206,259 @@ body{display:flex;flex-direction:column;background:var(--bg);background-image:ra
 </div>
 
 <script>
-var THEMES={dark:{bg:'#0a0a0a',surf:'#111111',border:'#2a2a2a'},amoled:{bg:'#000000',surf:'#0a0a0a',border:'#1a1a1a'},dim:{bg:'#18181f',surf:'#1e1e28',border:'#2e2e3e'}};
+'use strict';
 
-var I18N={
+/* ── Fuentes locales ─────────────────────────────────────────────────────── */
+function injectLocalFonts(baseUrl) {
+  if (!baseUrl) return;
+  // Intentar cargar Barlow-Black.ttf; si no existe, el fallback (Impact) ya esta en CSS.
+  var style = document.createElement('style');
+  style.textContent =
+    '@font-face{' +
+      'font-family:\'Barlow\';' +
+      'font-weight:900;' +
+      'font-style:normal;' +
+      'src:url(\'' + baseUrl + '/Barlow-Black.ttf\') format(\'truetype\');' +
+    '}' +
+    '@font-face{' +
+      'font-family:\'Barlow\';' +
+      'font-weight:700;' +
+      'font-style:normal;' +
+      'src:url(\'' + baseUrl + '/Barlow-Bold.ttf\') format(\'truetype\');' +
+    '}';
+  document.head.insertBefore(style, document.head.firstChild);
+}
+
+/* ── Temas ───────────────────────────────────────────────────────────────── */
+var THEMES = {
+  dark:  {bg:'#0a0a0a', surf:'#111111', border:'#2a2a2a'},
+  amoled:{bg:'#000000', surf:'#0a0a0a', border:'#1a1a1a'},
+  dim:   {bg:'#18181f', surf:'#1e1e28', border:'#2e2e3e'}
+};
+
+/* ── i18n ────────────────────────────────────────────────────────────────── */
+var I18N = {
   es:{sub:'for DaVinci Resolve',copy:'COPIAR',copyS:'frame del cabezal \u2192 portapapeles',paste:'PEGAR',pastS:'portapapeles \u2192 timeline',ready:'Listo',copying:'Capturando frame\u2026',pasting:'Procesando\u2026',err:'Error inesperado',title:'Ajustes',accent:'Acento',theme:'Tema',aot:'Always on Top',lang:'Idioma',save:'GUARDAR'},
   en:{sub:'for DaVinci Resolve',copy:'COPY',copyS:'playhead frame \u2192 clipboard',paste:'PASTE',pastS:'clipboard \u2192 timeline',ready:'Ready',copying:'Capturing frame\u2026',pasting:'Processing\u2026',err:'Unexpected error',title:'Settings',accent:'Accent',theme:'Theme',aot:'Always on Top',lang:'Language',save:'SAVE'},
   hi:{sub:'DaVinci Resolve \u0915\u0947 \u0932\u093f\u090f',copy:'\u0915\u0949\u092a\u0940',copyS:'\u092b\u094d\u0930\u0947\u092e \u2192 \u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921',paste:'\u092a\u0947\u0938\u094d\u091f',pastS:'\u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921 \u2192 \u091f\u093e\u0907\u092e\u0932\u093e\u0907\u0928',ready:'\u0924\u0948\u092f\u093e\u0930',copying:'\u0915\u0948\u092a\u094d\u091a\u0930\u2026',pasting:'\u092a\u094d\u0930\u094b\u0938\u0947\u0938\u093f\u0902\u0917\u2026',err:'\u0924\u094d\u0930\u0941\u091f\u093f',title:'\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938',accent:'\u0930\u0902\u0917',theme:'\u0925\u0940\u092e',aot:'Always on Top',lang:'\u092d\u093e\u0937\u093e',save:'\u0938\u0939\u0947\u091c\u0947\u0902'},
-  hg:{sub:'DaVinci Resolve ke liye',copy:'COPY KARO',copyS:'playhead frame \u2192 clipboard',paste:'PASTE KARO',pastS:'clipboard \u2192 timeline',ready:'Taiyaar',copying:'Capture ho raha hai\u2026',pasting:'Processing\u2026',err:'Error aa gaya',title:'Settings',accent:'Accent',theme:'Theme',aot:'Always on Top',lang:'Bhasha',save:'SAVE KARO'},
+  hg:{sub:'DaVinci Resolve ke liye',copy:'COPY KARO',copyS:'playhead frame \u2192 clipboard',paste:'PASTE KARO',pastS:'clipboard \u2192 timeline',ready:'Taiyaar',copying:'Capture ho raha hai\u2026',pasting:'Processing\u2026',err:'Error aa gaya',title:'Settings',accent:'Accent',theme:'Theme',aot:'Always on Top',lang:'Bhasha',save:'SAVE KARO'}
 };
 
-var cfg={accent:'#f5c842',theme:'dark',lang:'es',always_on_top:true};
-var T=I18N.es;
+/* ── Estado ──────────────────────────────────────────────────────────────── */
+var cfg = {accent:'#f5c842', theme:'dark', lang:'es', always_on_top:true};
+var T = I18N.es;
 
-function shiftHex(h,d){try{var n=parseInt(h.replace('#',''),16),cl=function(v){return Math.max(0,Math.min(255,v))};return '#'+[cl((n>>16)+d),cl(((n>>8)&0xff)+d),cl((n&0xff)+d)].map(function(x){return x.toString(16).padStart(2,'0')}).join('')}catch(_){return h}}
-
-function syncAotButtons(){
-  document.getElementById('aotOn').classList.toggle('active',cfg.always_on_top===true);
-  document.getElementById('aotOff').classList.toggle('active',cfg.always_on_top===false);
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function shiftHex(h, d) {
+  try {
+    var n = parseInt(h.replace('#',''), 16);
+    var cl = function(v){return Math.max(0, Math.min(255, v));};
+    return '#' + [cl((n>>16)+d), cl(((n>>8)&0xff)+d), cl((n&0xff)+d)]
+      .map(function(x){return x.toString(16).padStart(2,'0');}).join('');
+  } catch(_){return h;}
 }
 
-function applySettings(save){
-  T=I18N[cfg.lang]||I18N.es;
-  var th=THEMES[cfg.theme]||THEMES.dark,r=document.documentElement.style;
-  r.setProperty('--accent',cfg.accent);r.setProperty('--accent-h',shiftHex(cfg.accent,-12));
-  r.setProperty('--bg',th.bg);r.setProperty('--surf',th.surf);r.setProperty('--border',th.border);
-  document.getElementById('lblCopy').textContent=T.copy;
-  document.getElementById('subCopy').textContent=T.copyS;
-  document.getElementById('lblPaste').textContent=T.paste;
-  document.getElementById('subPaste').textContent=T.pastS;
-  document.getElementById('logoSub').textContent=T.sub;
-  document.getElementById('spTitle').textContent=T.title;
-  document.getElementById('spSave').textContent=T.save;
-  setLbl('spLblAccent',T.accent);
-  setLbl('spLblTheme',T.theme);
-  setLbl('spLblAot',T.aot);
-  setLbl('spLblLang',T.lang);
-  setStatus(T.ready,'');
-  document.querySelectorAll('.swatch').forEach(function(s){s.classList.toggle('active',s.dataset.color===cfg.accent)});
-  document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){b.classList.toggle('active',b.dataset.theme===cfg.theme)});
+function isValidHex(v) {
+  return /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(v.trim());
+}
+
+function syncAotButtons() {
+  document.getElementById('aotOn').classList.toggle('active', cfg.always_on_top === true);
+  document.getElementById('aotOff').classList.toggle('active', cfg.always_on_top === false);
+}
+
+function setLbl(id, txt) {
+  var el = document.getElementById(id);
+  if (el && el.childNodes[0]) el.childNodes[0].textContent = txt + ' ';
+}
+
+var dot = document.getElementById('dot');
+var stxt = document.getElementById('stxt');
+function setStatus(msg, level) {
+  var c = {ok:'var(--ok)', warn:'var(--warn)', error:'var(--err)', info:'#555'}[level] || '#252525';
+  dot.style.background = c;
+  stxt.style.color = level ? c : '#2e2e2e';
+  stxt.textContent = msg ? msg.toUpperCase() : '';
+}
+
+function setLoading(btn, on) { btn.classList.toggle('loading', on); }
+
+/* ── Campo hex ───────────────────────────────────────────────────────────── */
+var hexInput   = document.getElementById('hexInput');
+var hexPreview = document.getElementById('hexPreview');
+
+function syncHexField(accent) {
+  hexInput.value = accent.replace('#','');
+  hexPreview.style.background = accent;
+  hexInput.classList.remove('invalid');
+}
+
+hexInput.addEventListener('input', function() {
+  var val = hexInput.value.trim();
+  if (isValidHex(val)) {
+    var full = val.length === 3
+      ? '#' + val[0]+val[0]+val[1]+val[1]+val[2]+val[2]
+      : '#' + val;
+    hexPreview.style.background = full;
+    hexInput.classList.remove('invalid');
+    // Deseleccionar swatches si el color no coincide con ninguno
+    document.querySelectorAll('.swatch').forEach(function(s){
+      s.classList.toggle('active', s.dataset.color.toLowerCase() === full.toLowerCase());
+    });
+    // Actualizar acento en vivo
+    cfg.accent = full;
+    document.documentElement.style.setProperty('--accent', full);
+    document.documentElement.style.setProperty('--accent-h', shiftHex(full, -12));
+  } else {
+    hexInput.classList.add('invalid');
+    hexPreview.style.background = 'transparent';
+  }
+});
+
+/* ── Aplicar ajustes ─────────────────────────────────────────────────────── */
+function applySettings(save) {
+  T = I18N[cfg.lang] || I18N.es;
+  var th = THEMES[cfg.theme] || THEMES.dark;
+  var r  = document.documentElement.style;
+  r.setProperty('--accent', cfg.accent);
+  r.setProperty('--accent-h', shiftHex(cfg.accent, -12));
+  r.setProperty('--bg', th.bg);
+  r.setProperty('--surf', th.surf);
+  r.setProperty('--border', th.border);
+
+  document.getElementById('lblCopy').textContent  = T.copy;
+  document.getElementById('subCopy').textContent  = T.copyS;
+  document.getElementById('lblPaste').textContent = T.paste;
+  document.getElementById('subPaste').textContent = T.pastS;
+  document.getElementById('logoSub').textContent  = T.sub;
+  document.getElementById('spTitle').textContent  = T.title;
+  document.getElementById('spSave').textContent   = T.save;
+  setLbl('spLblAccent', T.accent);
+  setLbl('spLblTheme',  T.theme);
+  setLbl('spLblAot',    T.aot);
+  setLbl('spLblLang',   T.lang);
+  setStatus(T.ready, '');
+
+  // Swatches
+  document.querySelectorAll('.swatch').forEach(function(s){
+    s.classList.toggle('active', s.dataset.color.toLowerCase() === cfg.accent.toLowerCase());
+  });
+  // Campo hex
+  syncHexField(cfg.accent);
+  // Temas
+  document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.theme === cfg.theme);
+  });
   syncAotButtons();
-  document.getElementById('langSel').value=cfg.lang;
-  if(save){try{pywebview.api.save_settings(cfg)}catch(_){}}
+  document.getElementById('langSel').value = cfg.lang;
+
+  if (save) {
+    try { pywebview.api.save_settings(cfg); } catch(_){}
+  }
 }
-function setLbl(id,txt){var el=document.getElementById(id);if(el&&el.childNodes[0])el.childNodes[0].textContent=txt+' '}
 
-var dot=document.getElementById('dot'),stxt=document.getElementById('stxt');
-function setStatus(msg,level){var c={ok:'var(--ok)',warn:'var(--warn)',error:'var(--err)',info:'#555'}[level]||'#252525';dot.style.background=c;stxt.style.color=level?c:'#2e2e2e';stxt.textContent=msg?msg.toUpperCase():''}
-function setLoading(btn,on){btn.classList.toggle('loading',on)}
+/* ── Eventos botones principales ─────────────────────────────────────────── */
+var COPY = document.getElementById('copyBtn');
+var PSTE = document.getElementById('pasteBtn');
 
-// Buttons
-var COPY=document.getElementById('copyBtn'),PSTE=document.getElementById('pasteBtn');
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-action]');
-  if(!btn||btn.classList.contains('loading'))return;
-  var a=btn.dataset.action;
-  if(a==='copy'){setStatus(T.copying,'info');setLoading(COPY,true);pywebview.api.copy_frame().then(function(r){setLoading(COPY,false);setStatus(r.msg,r.level)}).catch(function(){setLoading(COPY,false);setStatus(T.err,'error')})}
-  if(a==='paste'){setStatus(T.pasting,'info');setLoading(PSTE,true);pywebview.api.paste_image().then(function(r){setLoading(PSTE,false);setStatus(r.msg,r.level)}).catch(function(){setLoading(PSTE,false);setStatus(T.err,'error')})}
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn || btn.classList.contains('loading')) return;
+  var a = btn.dataset.action;
+  if (a === 'copy') {
+    setStatus(T.copying, 'info'); setLoading(COPY, true);
+    pywebview.api.copy_frame().then(function(r){
+      setLoading(COPY, false); setStatus(r.msg, r.level);
+    }).catch(function(){setLoading(COPY, false); setStatus(T.err, 'error');});
+  }
+  if (a === 'paste') {
+    setStatus(T.pasting, 'info'); setLoading(PSTE, true);
+    pywebview.api.paste_image().then(function(r){
+      setLoading(PSTE, false); setStatus(r.msg, r.level);
+    }).catch(function(){setLoading(PSTE, false); setStatus(T.err, 'error');});
+  }
 });
 
-document.getElementById('closeBtn').addEventListener('click',function(){pywebview.api.close()});
-document.getElementById('minBtn').addEventListener('click',function(){pywebview.api.minimize()});
-document.getElementById('gearBtn').addEventListener('click',function(e){e.stopPropagation();document.getElementById('overlay').classList.add('open')});
-document.getElementById('spClose').addEventListener('click',function(){document.getElementById('overlay').classList.remove('open')});
-document.getElementById('overlay').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});
+document.getElementById('closeBtn').addEventListener('click',  function(){pywebview.api.close();});
+document.getElementById('minBtn').addEventListener('click',    function(){pywebview.api.minimize();});
+document.getElementById('gearBtn').addEventListener('click',   function(e){e.stopPropagation();document.getElementById('overlay').classList.add('open');});
+document.getElementById('spClose').addEventListener('click',   function(){document.getElementById('overlay').classList.remove('open');});
+document.getElementById('overlay').addEventListener('click',   function(e){if(e.target===this)this.classList.remove('open');});
 
-document.getElementById('swatches').addEventListener('click',function(e){var sw=e.target.closest('.swatch');if(!sw)return;document.querySelectorAll('.swatch').forEach(function(s){s.classList.remove('active')});sw.classList.add('active');cfg.accent=sw.dataset.color;document.documentElement.style.setProperty('--accent',cfg.accent);document.documentElement.style.setProperty('--accent-h',shiftHex(cfg.accent,-12))});
-document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn){btn.addEventListener('click',function(){document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');cfg.theme=btn.dataset.theme;var th=THEMES[cfg.theme]||THEMES.dark;document.documentElement.style.setProperty('--bg',th.bg);document.documentElement.style.setProperty('--surf',th.surf);document.documentElement.style.setProperty('--border',th.border)})});
-
-// Always on Top toggle (applies immediately, no need to save first)
-document.getElementById('aotOn').addEventListener('click',function(){
-  if(cfg.always_on_top===true)return;
-  cfg.always_on_top=true;syncAotButtons();
-  try{pywebview.api.set_always_on_top(true)}catch(_){}
-});
-document.getElementById('aotOff').addEventListener('click',function(){
-  if(cfg.always_on_top===false)return;
-  cfg.always_on_top=false;syncAotButtons();
-  try{pywebview.api.set_always_on_top(false)}catch(_){}
+/* ── Swatches ────────────────────────────────────────────────────────────── */
+document.getElementById('swatches').addEventListener('click', function(e) {
+  var sw = e.target.closest('.swatch');
+  if (!sw) return;
+  document.querySelectorAll('.swatch').forEach(function(s){s.classList.remove('active');});
+  sw.classList.add('active');
+  cfg.accent = sw.dataset.color;
+  document.documentElement.style.setProperty('--accent', cfg.accent);
+  document.documentElement.style.setProperty('--accent-h', shiftHex(cfg.accent, -12));
+  syncHexField(cfg.accent);
 });
 
-document.getElementById('spSave').addEventListener('click',function(){cfg.lang=document.getElementById('langSel').value;applySettings(true);document.getElementById('overlay').classList.remove('open')});
+/* ── Tema ────────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    cfg.theme = btn.dataset.theme;
+    var th = THEMES[cfg.theme] || THEMES.dark;
+    document.documentElement.style.setProperty('--bg',     th.bg);
+    document.documentElement.style.setProperty('--surf',   th.surf);
+    document.documentElement.style.setProperty('--border', th.border);
+  });
+});
 
-window.addEventListener('pywebviewready',function(){
-  Promise.all([pywebview.api.get_settings(),pywebview.api.get_system_lang()]).then(function(res){
-    var s=res[0],lang=res[1];
-    if(s){
-      cfg.accent=s.accent||cfg.accent;
-      cfg.theme=s.theme||cfg.theme;
-      cfg.lang=s.lang||cfg.lang;
-      cfg.always_on_top=s.always_on_top!==undefined?s.always_on_top:true;
+/* ── Always on Top ───────────────────────────────────────────────────────── */
+document.getElementById('aotOn').addEventListener('click', function() {
+  if (cfg.always_on_top === true) return;
+  cfg.always_on_top = true; syncAotButtons();
+  try{pywebview.api.set_always_on_top(true);}catch(_){}
+});
+document.getElementById('aotOff').addEventListener('click', function() {
+  if (cfg.always_on_top === false) return;
+  cfg.always_on_top = false; syncAotButtons();
+  try{pywebview.api.set_always_on_top(false);}catch(_){}
+});
+
+/* ── Guardar ─────────────────────────────────────────────────────────────── */
+document.getElementById('spSave').addEventListener('click', function() {
+  // Validar hex antes de guardar
+  var rawHex = hexInput.value.trim();
+  if (isValidHex(rawHex)) {
+    cfg.accent = rawHex.length === 3
+      ? '#' + rawHex[0]+rawHex[0]+rawHex[1]+rawHex[1]+rawHex[2]+rawHex[2]
+      : '#' + rawHex;
+  }
+  cfg.lang = document.getElementById('langSel').value;
+  applySettings(true);
+  document.getElementById('overlay').classList.remove('open');
+});
+
+/* ── Arranque ────────────────────────────────────────────────────────────── */
+window.addEventListener('pywebviewready', function() {
+  // Cargar fuentes locales y ajustes en paralelo
+  Promise.all([
+    pywebview.api.get_settings(),
+    pywebview.api.get_system_lang(),
+    pywebview.api.get_fonts_base_url()
+  ]).then(function(res) {
+    var s    = res[0];
+    var lang = res[1];
+    var furl = res[2];
+
+    if (furl) injectLocalFonts(furl);
+
+    if (s) {
+      cfg.accent       = s.accent       || cfg.accent;
+      cfg.theme        = s.theme        || cfg.theme;
+      cfg.lang         = s.lang         || cfg.lang;
+      cfg.always_on_top = s.always_on_top !== undefined ? s.always_on_top : true;
     }
-    if(!s||!s._lang_set){cfg.lang=lang||cfg.lang}
+    if (!s || !s._lang_set) { cfg.lang = lang || cfg.lang; }
     applySettings(false);
-  }).catch(function(){applySettings(false)});
+  }).catch(function() { applySettings(false); });
 });
 </script>
 </body>
