@@ -1,465 +1,251 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <style>
-/* ── Fuentes locales (cargadas via pywebview.api.get_fonts_base_url) ──────── */
-/* El bloque @font-face se inyecta desde JS una vez que Python devuelve la    */
-/* ruta real de la carpeta fonts/. Mientras tanto se usan los fallbacks.      */
+/* FONTS — copiado literal de MCopy */
+@font-face { font-family:'Monaspace Neon'; src:url('fonts/Monaspace_Neon_Var.woff2') format('woff2'); font-weight:100 900; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Regular.ttf') format('truetype'); font-weight:400; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Bold.ttf') format('truetype'); font-weight:700; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Black.ttf') format('truetype'); font-weight:900; font-display:block; }
 
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden}
-:root{
-  --accent:#f5c842;--accent-h:#f2bf35;
-  --bg:#0a0a0a;--surf:#111111;--border:#2a2a2a;
-  --text:#f0f0f0;--muted:#333333;--muted2:#555555;
-  --ok:#5ce07a;--warn:#f5c842;--err:#e05c5c
+/* VARIABLES — idéntico a MCopy */
+:root {
+  --bg:#0a0a0a; --sf:#111111; --sf2:#181818; --sf3:#222222;
+  --bd:#2a2a2a; --bd2:#3a3a3a;
+  --tx:#f0f0f0; --tx2:#888888; --tx3:#555555;
+  --ac:#f5c842; --red:#e05c5c; --grn:#5ce07a; --blu:#5c9ee0;
+  --r:4px; --tr:.13s ease;
+  --font-display:'Barlow Condensed',Impact,sans-serif;
+  --font-body:'Segoe UI',system-ui,sans-serif;
+  --font-mono:'Courier New',monospace;
+  --logo-weight:900; --logo-wght:900;
 }
-body{
-  display:flex;flex-direction:column;
-  background:var(--bg);
-  background-image:radial-gradient(circle,#ffffff08 1px,transparent 1px);
-  background-size:20px 20px;
-  font-family:'Segoe UI',sans-serif;
-  color:var(--text);
-  border:2px solid var(--border);border-radius:4px;
-  user-select:none;-webkit-user-select:none
-}
+/* RESET — idéntico a MCopy */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--tx);font-family:var(--font-body);font-size:12px;line-height:1.45;border:2px solid var(--bd);border-radius:var(--r);user-select:none;-webkit-user-select:none;}
+input,textarea,button,select{font-family:var(--font-body);font-size:12px;}
+input,textarea{user-select:text;-webkit-user-select:text;}
+input:focus,textarea:focus{outline:none;}
+button{cursor:pointer;border:none;background:none;color:inherit;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
 
-/* ── Topbar ──────────────────────────────────────────────────────────────── */
-.topbar{-webkit-app-region:drag;display:flex;align-items:center;padding:0 10px;height:40px;min-height:40px;background:var(--surf);border-bottom:2px solid var(--border);flex-shrink:0}
-.topbar-right{-webkit-app-region:no-drag;display:flex;align-items:center;gap:4px;margin-left:auto}
-.logo{font-family:'Barlow',Impact,sans-serif;font-weight:900;font-size:16px;letter-spacing:.04em;text-transform:uppercase;line-height:1}
-.logo em{color:var(--accent);font-style:normal}
-.logo-sub{font-size:7px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
-.icon-btn{-webkit-app-region:no-drag;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:2px;font-size:11px;color:#252525;transition:color .12s,background .12s}
-.icon-btn.minimize:hover{color:var(--accent);background:#f5c84218}
-.icon-btn.close:hover{color:var(--err);background:#e05c5c18}
+/* TOPBAR — idéntico a MCopy */
+#topbar{height:40px;min-height:40px;display:flex;align-items:center;padding:0 9px 0 13px;background:var(--sf);border-bottom:2px solid var(--bd);flex-shrink:0;cursor:default;}
+#logo-block{display:flex;flex-direction:column;justify-content:center;gap:2px;}
+.logo{font-family:var(--font-display);font-weight:var(--logo-weight);font-variation-settings:'wght' var(--logo-wght);font-size:19px;letter-spacing:.01em;text-transform:uppercase;color:var(--tx);line-height:1;}
+.logo em{color:var(--ac);font-style:normal;}
+.logo-sub{font-size:8px;color:var(--tx3);letter-spacing:.08em;text-transform:uppercase;line-height:1;}
+#topbar-right{display:flex;align-items:center;gap:2px;margin-left:auto;}
+.wbtn{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:3px;font-size:13px;color:var(--tx3);cursor:pointer;transition:color var(--tr),background var(--tr);flex-shrink:0;}
+.wbtn:hover{color:var(--tx2);background:var(--sf3);}
+.wbtn.wclose:hover{color:var(--red);background:rgba(224,92,92,.12);}
+.wbtn.wsettings:hover{color:var(--ac);}
 
-/* ── Panel principal ─────────────────────────────────────────────────────── */
-.mode-panel{display:flex;flex:1;flex-direction:column;justify-content:center}
-.btn-area{flex:1;display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 11px;-webkit-app-region:no-drag}
+/* BOTONES — copiado de MCopy .act-btn */
+.btn-area{flex:1;display:flex;flex-direction:column;justify-content:center;gap:7px;padding:11px 12px;}
+.act-btn{width:100%;border:2px solid var(--bd);border-radius:var(--r);padding:8px 11px 7px;background:var(--sf);cursor:pointer;transition:background var(--tr),border-color var(--tr),filter var(--tr);text-align:left;display:block;flex-shrink:0;}
+.act-btn:hover{background:var(--sf2);border-color:var(--bd2);}
+.act-btn:active{background:var(--bg);}
+.act-btn.primary{background:var(--ac);border-color:var(--ac);}
+.act-btn.primary:hover{filter:brightness(.88);}
+.act-btn.primary:active{filter:brightness(.78);}
+.act-btn.loading .lbl{animation:blink .65s ease infinite;}
+@keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+/* .lbl y .sub — idéntico a MCopy .act-btn .lbl / .act-btn .sub */
+.lbl{display:block;font-family:var(--font-display);font-weight:900;font-variation-settings:'wght' 900;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--tx);line-height:1;}
+.act-btn.primary .lbl{color:#000;}
+.sub{display:block;font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;line-height:1;}
+.act-btn.primary .sub{color:rgba(0,0,0,.42);}
 
-.mm-btn{border:2px solid var(--border);border-radius:3px;padding:7px 12px 6px;cursor:pointer;background:var(--surf);transition:background .1s,border-color .1s}
-.mm-btn:hover{background:#161616;border-color:#383838}
-.mm-btn:active{background:#0d0d0d}
-.mm-btn.primary{background:var(--accent);border-color:var(--accent)}
-.mm-btn.primary:hover{background:var(--accent-h);border-color:var(--accent-h)}
-.mm-btn.primary:active{filter:brightness(.9)}
-.mm-btn.loading{opacity:.4;pointer-events:none}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
-.mm-btn.loading .btn-label{animation:blink .8s ease infinite}
-.btn-label{display:block;font-family:'Barlow',Impact,sans-serif;font-weight:900;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text);line-height:1}
-.mm-btn.primary .btn-label{color:#000}
-.btn-sub{display:block;font-size:8px;color:#404040;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;line-height:1}
-.mm-btn.primary .btn-sub{color:#00000055}
-
-/* ── Statusbar ───────────────────────────────────────────────────────────── */
-.statusbar{-webkit-app-region:no-drag;display:flex;align-items:center;gap:7px;height:24px;min-height:24px;background:var(--surf);border-top:2px solid var(--border);padding:0 10px;flex-shrink:0}
-.dot{width:5px;height:5px;border-radius:50%;background:#252525;flex-shrink:0;transition:background .25s}
-.stxt{font-size:8px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#2e2e2e;transition:color .25s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
-
-/* ── Settings overlay ────────────────────────────────────────────────────── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:200;-webkit-app-region:no-drag}
-.overlay.open{display:flex}
-.sp{background:var(--surf);border:2px solid var(--border);border-radius:4px;width:220px;max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-.sp::-webkit-scrollbar{width:4px}
-.sp::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sp-hdr{background:#0d0d0d;border-bottom:1px solid var(--border);padding:7px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1}
-.sp-title{font-family:'Barlow',Impact,sans-serif;font-weight:900;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
-.sp-x{color:var(--muted2);font-size:12px;cursor:pointer;transition:color .12s}
-.sp-x:hover{color:var(--err)}
-.sp-body{padding:8px 12px;display:flex;flex-direction:column;gap:8px}
-.sp-row{display:flex;flex-direction:column;gap:5px}
-.sp-lbl{font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:5px}
-.sp-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
-
-/* Swatches + campo hex */
-.accent-wrap{display:flex;flex-direction:column;gap:5px}
-.swatches{display:flex;gap:5px;flex-wrap:wrap}
-.swatch{width:18px;height:18px;border-radius:3px;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:border-color .12s,transform .1s}
-.swatch:hover{transform:scale(1.12)}
-.swatch.active{border-color:var(--text)}
-.hex-row{display:flex;gap:5px;align-items:center}
-.hex-prefix{font-size:9px;font-weight:700;color:var(--muted2);font-family:'Barlow',Impact,sans-serif;letter-spacing:.04em;flex-shrink:0}
-.hex-input{
-  flex:1;background:#0d0d0d;border:2px solid var(--border);border-radius:3px;
-  color:var(--text);font-family:'Segoe UI',sans-serif;font-size:10px;
-  padding:3px 6px;outline:none;width:0;text-transform:uppercase;
-  letter-spacing:.08em;transition:border-color .12s
-}
-.hex-input:focus{border-color:var(--accent)}
-.hex-input.invalid{border-color:var(--err)}
-.hex-preview{width:18px;height:18px;border-radius:3px;border:2px solid var(--border);flex-shrink:0;transition:background .1s}
-
-.theme-row{display:flex;gap:4px}
-.theme-btn{flex:1;padding:5px 0;text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:2px solid var(--border);border-radius:3px;cursor:pointer;background:#0d0d0d;color:var(--muted2);transition:border-color .1s,color .1s}
-.theme-btn:hover{border-color:#444;color:var(--text)}
-.theme-btn.active{border-color:var(--accent);color:var(--accent)}
-.sp-select{background:#0d0d0d;border:2px solid var(--border);border-radius:3px;color:var(--text);font-family:'Segoe UI',sans-serif;font-size:10px;padding:4px 8px;width:100%;cursor:pointer;appearance:none;outline:none}
-.sp-select:focus{border-color:var(--accent)}
-.sp-select option{background:#111}
-.sp-footer{padding:6px 12px 8px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;position:sticky;bottom:0;background:var(--surf)}
-.sp-save{background:var(--accent);color:#000;border:none;border-radius:3px;padding:5px 16px;font-family:'Barlow',Impact,sans-serif;font-weight:900;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:filter .1s}
-.sp-save:hover{filter:brightness(.92)}
-.sp-save:active{filter:brightness(.85)}
+/* STATUSBAR — idéntico a MCopy */
+#statusbar{height:26px;min-height:26px;display:flex;align-items:center;gap:7px;padding:0 11px;background:var(--sf);border-top:2px solid var(--bd);flex-shrink:0;}
+#sb-dot{width:6px;height:6px;border-radius:50%;background:var(--tx3);flex-shrink:0;transition:background var(--tr);}
+#sb-txt{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);transition:color var(--tr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div>
-    <div class="logo"><em>M</em>PASTE</div>
-    <div class="logo-sub" id="logoSub">for DaVinci Resolve</div>
-  </div>
-  <div class="topbar-right">
-    <div class="icon-btn" id="gearBtn" style="font-size:12px">&#9881;</div>
-    <div class="icon-btn minimize" id="minBtn">&#x2013;</div>
-    <div class="icon-btn close" id="closeBtn">&#x2715;</div>
-  </div>
-</div>
-
-<div class="mode-panel" id="panel-img">
-  <div class="btn-area">
-    <div class="mm-btn" id="copyBtn" data-action="copy">
-      <span class="btn-label" id="lblCopy">COPIAR</span>
-      <span class="btn-sub" id="subCopy">frame del cabezal &rarr; portapapeles</span>
+<div id="topbar">
+  <div id="drag" style="display:flex;align-items:center;flex:1;cursor:move;height:100%;">
+    <div id="logo-block">
+      <div class="logo"><em>M</em>PASTE</div>
+      <div class="logo-sub" id="logo-sub">for DaVinci Resolve</div>
     </div>
-    <div class="mm-btn primary" id="pasteBtn" data-action="paste">
-      <span class="btn-label" id="lblPaste">PEGAR</span>
-      <span class="btn-sub" id="subPaste">portapapeles &rarr; timeline</span>
-    </div>
+  </div>
+  <div id="topbar-right">
+    <div class="wbtn wsettings" id="btn-settings">&#9881;</div>
+    <div class="wbtn" id="btn-min">&#8211;</div>
+    <div class="wbtn wclose" id="btn-close">&#10005;</div>
   </div>
 </div>
 
-<div class="statusbar">
-  <div class="dot" id="dot"></div>
-  <span class="stxt" id="stxt">Listo</span>
+<div class="btn-area">
+  <button class="act-btn" id="copyBtn" data-action="copy">
+    <span class="lbl" id="lbl-copy">COPIAR</span>
+    <span class="sub" id="sub-copy">frame del cabezal &rarr; portapapeles</span>
+  </button>
+  <button class="act-btn primary" id="pasteBtn" data-action="paste">
+    <span class="lbl" id="lbl-paste">PEGAR</span>
+    <span class="sub" id="sub-paste">portapapeles &rarr; timeline</span>
+  </button>
 </div>
 
-<!-- Settings -->
-<div class="overlay" id="overlay">
-  <div class="sp">
-    <div class="sp-hdr">
-      <span class="sp-title" id="spTitle">Ajustes</span>
-      <span class="sp-x" id="spClose">&#x2715;</span>
-    </div>
-    <div class="sp-body">
-
-      <!-- Acento -->
-      <div class="sp-row">
-        <div class="sp-lbl" id="spLblAccent">Acento</div>
-        <div class="accent-wrap">
-          <div class="swatches" id="swatches">
-            <div class="swatch" data-color="#f5c842" style="background:#f5c842"></div>
-            <div class="swatch" data-color="#5ce07a" style="background:#5ce07a"></div>
-            <div class="swatch" data-color="#5d8ef0" style="background:#5d8ef0"></div>
-            <div class="swatch" data-color="#e05c5c" style="background:#e05c5c"></div>
-            <div class="swatch" data-color="#c77dff" style="background:#c77dff"></div>
-            <div class="swatch" data-color="#ff9f43" style="background:#ff9f43"></div>
-            <div class="swatch" data-color="#f0f0f0" style="background:#f0f0f0"></div>
-          </div>
-          <!-- Campo hex personalizado -->
-          <div class="hex-row">
-            <span class="hex-prefix">#</span>
-            <input class="hex-input" id="hexInput" maxlength="6" placeholder="f5c842" spellcheck="false">
-            <div class="hex-preview" id="hexPreview"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tema -->
-      <div class="sp-row">
-        <div class="sp-lbl" id="spLblTheme">Tema</div>
-        <div class="theme-row">
-          <div class="theme-btn" data-theme="dark">Dark</div>
-          <div class="theme-btn" data-theme="amoled">AMOLED</div>
-          <div class="theme-btn" data-theme="dim">Dim</div>
-        </div>
-      </div>
-
-      <!-- Always on Top -->
-      <div class="sp-row">
-        <div class="sp-lbl" id="spLblAot">Always on Top</div>
-        <div class="theme-row">
-          <div class="theme-btn" id="aotOn">On</div>
-          <div class="theme-btn" id="aotOff">Off</div>
-        </div>
-      </div>
-
-      <!-- Idioma -->
-      <div class="sp-row">
-        <div class="sp-lbl" id="spLblLang">Idioma</div>
-        <select class="sp-select" id="langSel">
-          <option value="es">Espa&ntilde;ol</option>
-          <option value="en">English</option>
-          <option value="hi">Hindi</option>
-          <option value="hg">Hinglish</option>
-        </select>
-      </div>
-
-    </div>
-    <div class="sp-footer">
-      <button class="sp-save" id="spSave">GUARDAR</button>
-    </div>
-  </div>
+<div id="statusbar">
+  <div id="sb-dot"></div>
+  <span id="sb-txt">Listo</span>
 </div>
 
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
 'use strict';
 
-/* ── Fuentes locales ─────────────────────────────────────────────────────── */
-function injectLocalFonts(baseUrl) {
-  if (!baseUrl) return;
-  // Intentar cargar Barlow-Black.ttf; si no existe, el fallback (Impact) ya esta en CSS.
-  var style = document.createElement('style');
-  style.textContent =
-    '@font-face{' +
-      'font-family:\'Barlow\';' +
-      'font-weight:900;' +
-      'font-style:normal;' +
-      'src:url(\'' + baseUrl + '/Barlow-Black.ttf\') format(\'truetype\');' +
-    '}' +
-    '@font-face{' +
-      'font-family:\'Barlow\';' +
-      'font-weight:700;' +
-      'font-style:normal;' +
-      'src:url(\'' + baseUrl + '/Barlow-Bold.ttf\') format(\'truetype\');' +
-    '}';
-  document.head.insertBefore(style, document.head.firstChild);
-}
-
-/* ── Temas ───────────────────────────────────────────────────────────────── */
-var THEMES = {
-  dark:  {bg:'#0a0a0a', surf:'#111111', border:'#2a2a2a'},
-  amoled:{bg:'#000000', surf:'#0a0a0a', border:'#1a1a1a'},
-  dim:   {bg:'#18181f', surf:'#1e1e28', border:'#2e2e3e'}
-};
-
-/* ── i18n ────────────────────────────────────────────────────────────────── */
-var I18N = {
-  es:{sub:'for DaVinci Resolve',copy:'COPIAR',copyS:'frame del cabezal \u2192 portapapeles',paste:'PEGAR',pastS:'portapapeles \u2192 timeline',ready:'Listo',copying:'Capturando frame\u2026',pasting:'Procesando\u2026',err:'Error inesperado',title:'Ajustes',accent:'Acento',theme:'Tema',aot:'Always on Top',lang:'Idioma',save:'GUARDAR'},
-  en:{sub:'for DaVinci Resolve',copy:'COPY',copyS:'playhead frame \u2192 clipboard',paste:'PASTE',pastS:'clipboard \u2192 timeline',ready:'Ready',copying:'Capturing frame\u2026',pasting:'Processing\u2026',err:'Unexpected error',title:'Settings',accent:'Accent',theme:'Theme',aot:'Always on Top',lang:'Language',save:'SAVE'},
-  hi:{sub:'DaVinci Resolve \u0915\u0947 \u0932\u093f\u090f',copy:'\u0915\u0949\u092a\u0940',copyS:'\u092b\u094d\u0930\u0947\u092e \u2192 \u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921',paste:'\u092a\u0947\u0938\u094d\u091f',pastS:'\u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921 \u2192 \u091f\u093e\u0907\u092e\u0932\u093e\u0907\u0928',ready:'\u0924\u0948\u092f\u093e\u0930',copying:'\u0915\u0948\u092a\u094d\u091a\u0930\u2026',pasting:'\u092a\u094d\u0930\u094b\u0938\u0947\u0938\u093f\u0902\u0917\u2026',err:'\u0924\u094d\u0930\u0941\u091f\u093f',title:'\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938',accent:'\u0930\u0902\u0917',theme:'\u0925\u0940\u092e',aot:'Always on Top',lang:'\u092d\u093e\u0937\u093e',save:'\u0938\u0939\u0947\u091c\u0947\u0902'},
-  hg:{sub:'DaVinci Resolve ke liye',copy:'COPY KARO',copyS:'playhead frame \u2192 clipboard',paste:'PASTE KARO',pastS:'clipboard \u2192 timeline',ready:'Taiyaar',copying:'Capture ho raha hai\u2026',pasting:'Processing\u2026',err:'Error aa gaya',title:'Settings',accent:'Accent',theme:'Theme',aot:'Always on Top',lang:'Bhasha',save:'SAVE KARO'}
-};
-
-/* ── Estado ──────────────────────────────────────────────────────────────── */
-var cfg = {accent:'#f5c842', theme:'dark', lang:'es', always_on_top:true};
-var T = I18N.es;
-
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
-function shiftHex(h, d) {
-  try {
-    var n = parseInt(h.replace('#',''), 16);
-    var cl = function(v){return Math.max(0, Math.min(255, v));};
-    return '#' + [cl((n>>16)+d), cl(((n>>8)&0xff)+d), cl((n&0xff)+d)]
-      .map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-  } catch(_){return h;}
-}
-
-function isValidHex(v) {
-  return /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(v.trim());
-}
-
-function syncAotButtons() {
-  document.getElementById('aotOn').classList.toggle('active', cfg.always_on_top === true);
-  document.getElementById('aotOff').classList.toggle('active', cfg.always_on_top === false);
-}
-
-function setLbl(id, txt) {
-  var el = document.getElementById(id);
-  if (el && el.childNodes[0]) el.childNodes[0].textContent = txt + ' ';
-}
-
-var dot = document.getElementById('dot');
-var stxt = document.getElementById('stxt');
-function setStatus(msg, level) {
-  var c = {ok:'var(--ok)', warn:'var(--warn)', error:'var(--err)', info:'#555'}[level] || '#252525';
-  dot.style.background = c;
-  stxt.style.color = level ? c : '#2e2e2e';
-  stxt.textContent = msg ? msg.toUpperCase() : '';
-}
-
-function setLoading(btn, on) { btn.classList.toggle('loading', on); }
-
-/* ── Campo hex ───────────────────────────────────────────────────────────── */
-var hexInput   = document.getElementById('hexInput');
-var hexPreview = document.getElementById('hexPreview');
-
-function syncHexField(accent) {
-  hexInput.value = accent.replace('#','');
-  hexPreview.style.background = accent;
-  hexInput.classList.remove('invalid');
-}
-
-hexInput.addEventListener('input', function() {
-  var val = hexInput.value.trim();
-  if (isValidHex(val)) {
-    var full = val.length === 3
-      ? '#' + val[0]+val[0]+val[1]+val[1]+val[2]+val[2]
-      : '#' + val;
-    hexPreview.style.background = full;
-    hexInput.classList.remove('invalid');
-    // Deseleccionar swatches si el color no coincide con ninguno
-    document.querySelectorAll('.swatch').forEach(function(s){
-      s.classList.toggle('active', s.dataset.color.toLowerCase() === full.toLowerCase());
-    });
-    // Actualizar acento en vivo
-    cfg.accent = full;
-    document.documentElement.style.setProperty('--accent', full);
-    document.documentElement.style.setProperty('--accent-h', shiftHex(full, -12));
-  } else {
-    hexInput.classList.add('invalid');
-    hexPreview.style.background = 'transparent';
-  }
+/* ── QWebChannel bootstrap ───────────────────────────────────────────────── */
+var backend = null;
+new QWebChannel(qt.webChannelTransport, function(ch) {
+  backend = ch.objects.backend;
+  _init();
 });
 
-/* ── Aplicar ajustes ─────────────────────────────────────────────────────── */
-function applySettings(save) {
-  T = I18N[cfg.lang] || I18N.es;
-  var th = THEMES[cfg.theme] || THEMES.dark;
-  var r  = document.documentElement.style;
-  r.setProperty('--accent', cfg.accent);
-  r.setProperty('--accent-h', shiftHex(cfg.accent, -12));
-  r.setProperty('--bg', th.bg);
-  r.setProperty('--surf', th.surf);
-  r.setProperty('--border', th.border);
-
-  document.getElementById('lblCopy').textContent  = T.copy;
-  document.getElementById('subCopy').textContent  = T.copyS;
-  document.getElementById('lblPaste').textContent = T.paste;
-  document.getElementById('subPaste').textContent = T.pastS;
-  document.getElementById('logoSub').textContent  = T.sub;
-  document.getElementById('spTitle').textContent  = T.title;
-  document.getElementById('spSave').textContent   = T.save;
-  setLbl('spLblAccent', T.accent);
-  setLbl('spLblTheme',  T.theme);
-  setLbl('spLblAot',    T.aot);
-  setLbl('spLblLang',   T.lang);
-  setStatus(T.ready, '');
-
-  // Swatches
-  document.querySelectorAll('.swatch').forEach(function(s){
-    s.classList.toggle('active', s.dataset.color.toLowerCase() === cfg.accent.toLowerCase());
+/* Llama un Slot con retorno → Promise */
+function call(method) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(resolve, reject) {
+    try {
+      args.push(function(r) { resolve(r); });
+      backend[method].apply(backend, args);
+    } catch(e) { reject(e); }
   });
-  // Campo hex
-  syncHexField(cfg.accent);
-  // Temas
-  document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){
-    b.classList.toggle('active', b.dataset.theme === cfg.theme);
-  });
-  syncAotButtons();
-  document.getElementById('langSel').value = cfg.lang;
-
-  if (save) {
-    try { pywebview.api.save_settings(cfg); } catch(_){}
-  }
 }
 
-/* ── Eventos botones principales ─────────────────────────────────────────── */
-var COPY = document.getElementById('copyBtn');
-var PSTE = document.getElementById('pasteBtn');
+/* ── Temas — idéntico a MCopy ────────────────────────────────────────────── */
+var THEMES = {
+  mmarket:{vars:{'--bg':'#0a0a0a','--sf':'#111111','--sf2':'#181818','--sf3':'#222222','--bd':'#2a2a2a','--bd2':'#3a3a3a','--tx':'#f0f0f0','--tx2':'#888888','--tx3':'#555555','--red':'#e05c5c','--grn':'#5ce07a','--blu':'#5c9ee0'},accents:['#f5c842','#5ce07a','#5c9ee0','#e05c5c','#b48ae0','#e08a5c'],def:'#f5c842'},
+  rosepine:{vars:{'--bg':'#191724','--sf':'#1f1d2e','--sf2':'#26233a','--sf3':'#403d52','--bd':'#21202e','--bd2':'#524f67','--tx':'#e0def4','--tx2':'#908caa','--tx3':'#6e6a86','--red':'#eb6f92','--grn':'#9ccfd8','--blu':'#31748f'},accents:['#f6c177','#eb6f92','#ebbcba','#31748f','#9ccfd8','#c4a7e7'],def:'#f6c177'},
+  gruvbox:{vars:{'--bg':'#1d2021','--sf':'#282828','--sf2':'#3c3836','--sf3':'#504945','--bd':'#45403d','--bd2':'#5a524c','--tx':'#d4be98','--tx2':'#a89984','--tx3':'#928374','--red':'#ea6962','--grn':'#a9b665','--blu':'#7daea3'},accents:['#d8a657','#ea6962','#e78a4e','#a9b665','#89b482','#7daea3','#d3869b'],def:'#d8a657'}
+};
+
+/* ── Fuentes — idéntico a MCopy ─────────────────────────────────────────── */
+var FONTS = {
+  barlow:    {display:"'Barlow Condensed',Impact,sans-serif",    body:"'Segoe UI',system-ui,sans-serif"},
+  monaspace: {display:"'Monaspace Neon',monospace",              body:"'Monaspace Neon',monospace"}
+};
+
+/* ── i18n ───────────────────────────────────────────────────────────────── */
+var I18N = {
+  es:{sub:'for DaVinci Resolve',copy:'COPIAR',copyS:'frame del cabezal \u2192 portapapeles',paste:'PEGAR',pastS:'portapapeles \u2192 timeline',ready:'Listo',copying:'Capturando frame\u2026',pasting:'Procesando\u2026',err:'Error inesperado'},
+  en:{sub:'for DaVinci Resolve',copy:'COPY',  copyS:'playhead frame \u2192 clipboard',      paste:'PASTE', pastS:'clipboard \u2192 timeline',         ready:'Ready',  copying:'Capturing frame\u2026',pasting:'Processing\u2026',err:'Unexpected error'},
+  hi:{sub:'DaVinci Resolve \u0915\u0947 \u0932\u093f\u090f',copy:'\u0915\u0949\u092a\u0940',copyS:'\u092b\u094d\u0930\u0947\u092e \u2192 \u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921',paste:'\u092a\u0947\u0938\u094d\u091f',pastS:'\u0915\u094d\u0932\u093f\u092a\u092c\u094b\u0930\u094d\u0921 \u2192 \u091f\u093e\u0907\u092e\u0932\u093e\u0907\u0928',ready:'\u0924\u0948\u092f\u093e\u0930',copying:'\u0915\u0948\u092a\u094d\u091a\u0930\u2026',pasting:'\u092a\u094d\u0930\u094b\u0938\u0947\u0938\u093f\u0902\u0917\u2026',err:'\u0924\u094d\u0930\u0941\u091f\u093f'},
+  hg:{sub:'DaVinci Resolve ke liye',          copy:'COPY KARO',copyS:'playhead frame \u2192 clipboard',paste:'PASTE KARO',pastS:'clipboard \u2192 timeline',ready:'Taiyaar',copying:'Capture ho raha hai\u2026',pasting:'Processing\u2026',err:'Error aa gaya'}
+};
+
+/* ── Estado ─────────────────────────────────────────────────────────────── */
+var cfg = {theme:'mmarket', accent:'#f5c842', font:'barlow', lang:'es', always_on_top:true};
+var T = I18N.es;
+
+/* ── Aplicar tema/fuente/acento — igual que MCopy ────────────────────────── */
+function applyThemeVars(th) {
+  var Th = THEMES[th]; if(!Th) return;
+  for(var v in Th.vars) document.documentElement.style.setProperty(v, Th.vars[v]);
+}
+function applyAccent(c) {
+  document.documentElement.style.setProperty('--ac', c);
+}
+function applyFont(f) {
+  var F = FONTS[f] || FONTS.barlow;
+  document.documentElement.style.setProperty('--font-display', F.display);
+  document.documentElement.style.setProperty('--font-body',    F.body);
+  document.body.style.fontFamily = F.body;
+  var lw = f === 'monaspace' ? '800' : '900';
+  document.documentElement.style.setProperty('--logo-weight', lw);
+  document.documentElement.style.setProperty('--logo-wght',   lw);
+  document.querySelectorAll('input,textarea,button').forEach(function(el) {
+    el.style.fontFamily = F.body;
+  });
+}
+function applyI18n(lang) {
+  T = I18N[lang] || I18N.es;
+  document.getElementById('logo-sub').textContent  = T.sub;
+  document.getElementById('lbl-copy').textContent  = T.copy;
+  document.getElementById('sub-copy').textContent  = T.copyS;
+  document.getElementById('lbl-paste').textContent = T.paste;
+  document.getElementById('sub-paste').textContent = T.pastS;
+  setStatus(T.ready, '');
+}
+function applySettings(save) {
+  applyThemeVars(cfg.theme);
+  applyAccent(cfg.accent);
+  applyFont(cfg.font);
+  applyI18n(cfg.lang);
+  if(save) call('save_settings', JSON.stringify(cfg)).catch(function(){});
+}
+
+/* ── Status — igual que MCopy ────────────────────────────────────────────── */
+var $dot = document.getElementById('sb-dot');
+var $txt = document.getElementById('sb-txt');
+function setStatus(msg, level) {
+  var m = {ok:'var(--grn)', err:'var(--red)', warn:'var(--ac)', info:'var(--blu)'};
+  $dot.style.background = m[level] || 'var(--tx3)';
+  $txt.style.color      = m[level] || 'var(--tx3)';
+  $txt.textContent      = msg || T.ready;
+}
+
+/* ── Drag — mismo patrón que MCopy (sin preventDefault) ─────────────────── */
+document.getElementById('drag').addEventListener('mousedown', function(e) {
+  if(e.button !== 0 || e.target.closest('#topbar-right')) return;
+  if(backend) backend.start_move();
+});
+
+/* ── Botones ─────────────────────────────────────────────────────────────── */
+var $copy  = document.getElementById('copyBtn');
+var $paste = document.getElementById('pasteBtn');
 
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-action]');
-  if (!btn || btn.classList.contains('loading')) return;
-  var a = btn.dataset.action;
-  if (a === 'copy') {
-    setStatus(T.copying, 'info'); setLoading(COPY, true);
-    pywebview.api.copy_frame().then(function(r){
-      setLoading(COPY, false); setStatus(r.msg, r.level);
-    }).catch(function(){setLoading(COPY, false); setStatus(T.err, 'error');});
+  if(!btn || btn.classList.contains('loading')) return;
+  if(btn.dataset.action === 'copy') {
+    setStatus(T.copying, 'info'); $copy.classList.add('loading');
+    call('copy_frame').then(function(raw) {
+      var r = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      $copy.classList.remove('loading'); setStatus(r.msg, r.level);
+    }).catch(function() { $copy.classList.remove('loading'); setStatus(T.err, 'err'); });
   }
-  if (a === 'paste') {
-    setStatus(T.pasting, 'info'); setLoading(PSTE, true);
-    pywebview.api.paste_image().then(function(r){
-      setLoading(PSTE, false); setStatus(r.msg, r.level);
-    }).catch(function(){setLoading(PSTE, false); setStatus(T.err, 'error');});
+  if(btn.dataset.action === 'paste') {
+    setStatus(T.pasting, 'info'); $paste.classList.add('loading');
+    call('paste_image').then(function(raw) {
+      var r = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      $paste.classList.remove('loading'); setStatus(r.msg, r.level);
+    }).catch(function() { $paste.classList.remove('loading'); setStatus(T.err, 'err'); });
   }
 });
 
-document.getElementById('closeBtn').addEventListener('click',  function(){pywebview.api.close();});
-document.getElementById('minBtn').addEventListener('click',    function(){pywebview.api.minimize();});
-document.getElementById('gearBtn').addEventListener('click',   function(e){e.stopPropagation();document.getElementById('overlay').classList.add('open');});
-document.getElementById('spClose').addEventListener('click',   function(){document.getElementById('overlay').classList.remove('open');});
-document.getElementById('overlay').addEventListener('click',   function(e){if(e.target===this)this.classList.remove('open');});
+document.getElementById('btn-close').addEventListener('click',    function() { if(backend) backend.close_window(); });
+document.getElementById('btn-min').addEventListener('click',      function() { if(backend) backend.minimize_window(); });
+document.getElementById('btn-settings').addEventListener('click', function() { if(backend) backend.open_settings(); });
 
-/* ── Swatches ────────────────────────────────────────────────────────────── */
-document.getElementById('swatches').addEventListener('click', function(e) {
-  var sw = e.target.closest('.swatch');
-  if (!sw) return;
-  document.querySelectorAll('.swatch').forEach(function(s){s.classList.remove('active');});
-  sw.classList.add('active');
-  cfg.accent = sw.dataset.color;
-  document.documentElement.style.setProperty('--accent', cfg.accent);
-  document.documentElement.style.setProperty('--accent-h', shiftHex(cfg.accent, -12));
-  syncHexField(cfg.accent);
-});
-
-/* ── Tema ────────────────────────────────────────────────────────────────── */
-document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.theme-btn[data-theme]').forEach(function(b){b.classList.remove('active');});
-    btn.classList.add('active');
-    cfg.theme = btn.dataset.theme;
-    var th = THEMES[cfg.theme] || THEMES.dark;
-    document.documentElement.style.setProperty('--bg',     th.bg);
-    document.documentElement.style.setProperty('--surf',   th.surf);
-    document.documentElement.style.setProperty('--border', th.border);
-  });
-});
-
-/* ── Always on Top ───────────────────────────────────────────────────────── */
-document.getElementById('aotOn').addEventListener('click', function() {
-  if (cfg.always_on_top === true) return;
-  cfg.always_on_top = true; syncAotButtons();
-  try{pywebview.api.set_always_on_top(true);}catch(_){}
-});
-document.getElementById('aotOff').addEventListener('click', function() {
-  if (cfg.always_on_top === false) return;
-  cfg.always_on_top = false; syncAotButtons();
-  try{pywebview.api.set_always_on_top(false);}catch(_){}
-});
-
-/* ── Guardar ─────────────────────────────────────────────────────────────── */
-document.getElementById('spSave').addEventListener('click', function() {
-  // Validar hex antes de guardar
-  var rawHex = hexInput.value.trim();
-  if (isValidHex(rawHex)) {
-    cfg.accent = rawHex.length === 3
-      ? '#' + rawHex[0]+rawHex[0]+rawHex[1]+rawHex[1]+rawHex[2]+rawHex[2]
-      : '#' + rawHex;
-  }
-  cfg.lang = document.getElementById('langSel').value;
-  applySettings(true);
-  document.getElementById('overlay').classList.remove('open');
-});
-
-/* ── Arranque ────────────────────────────────────────────────────────────── */
-window.addEventListener('pywebviewready', function() {
-  // Cargar fuentes locales y ajustes en paralelo
+/* ── Init ────────────────────────────────────────────────────────────────── */
+function _init() {
   Promise.all([
-    pywebview.api.get_settings(),
-    pywebview.api.get_system_lang(),
-    pywebview.api.get_fonts_base_url()
+    call('get_settings'),
+    call('get_system_lang')
   ]).then(function(res) {
-    var s    = res[0];
+    var s = null;
+    try { s = typeof res[0] === 'string' ? JSON.parse(res[0]) : res[0]; } catch(_) {}
     var lang = res[1];
-    var furl = res[2];
-
-    if (furl) injectLocalFonts(furl);
-
-    if (s) {
-      cfg.accent       = s.accent       || cfg.accent;
-      cfg.theme        = s.theme        || cfg.theme;
-      cfg.lang         = s.lang         || cfg.lang;
-      cfg.always_on_top = s.always_on_top !== undefined ? s.always_on_top : true;
+    if(s) {
+      if(s.theme  && THEMES[s.theme])  cfg.theme  = s.theme;
+      if(s.accent)                     cfg.accent = s.accent;
+      if(s.font   && FONTS[s.font])    cfg.font   = s.font;
+      if(s.lang   && I18N[s.lang])     cfg.lang   = s.lang;
+      if(s.always_on_top !== undefined) cfg.always_on_top = s.always_on_top;
     }
-    if (!s || !s._lang_set) { cfg.lang = lang || cfg.lang; }
+    if(!s || !s.lang) cfg.lang = (I18N[lang] ? lang : cfg.lang);
     applySettings(false);
   }).catch(function() { applySettings(false); });
-});
+}
 </script>
 </body>
 </html>
