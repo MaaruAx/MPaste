@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+/* FONTS — idéntico a ui.html / MCopy */
+@font-face { font-family:'Monaspace Neon'; src:url('fonts/Monaspace_Neon_Var.woff2') format('woff2'); font-weight:100 900; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Regular.ttf') format('truetype'); font-weight:400; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Bold.ttf') format('truetype'); font-weight:700; font-display:block; }
+@font-face { font-family:'Barlow Condensed'; src:url('fonts/BarlowCondensed-Black.ttf') format('truetype'); font-weight:900; font-display:block; }
+
+/* VARIABLES — idéntico a MCopy */
+:root {
+  --bg:#0a0a0a; --sf:#111111; --sf2:#181818; --sf3:#222222;
+  --bd:#2a2a2a; --bd2:#3a3a3a;
+  --tx:#f0f0f0; --tx2:#888888; --tx3:#555555;
+  --ac:#f5c842; --red:#e05c5c;
+  --r:4px; --tr:.13s ease;
+  --font-display:'Barlow Condensed',Impact,sans-serif;
+  --font-body:'Segoe UI',system-ui,sans-serif;
+  --logo-weight:900; --logo-wght:900;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{
+  display:flex;flex-direction:column;
+  background:var(--sf);color:var(--tx);
+  font-family:var(--font-body);font-size:12px;line-height:1.45;
+  border:2px solid var(--bd);
+  user-select:none;-webkit-user-select:none;
+}
+input,button{font-family:var(--font-body);font-size:12px;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+/* HEADER */
+#s-hdr{
+  height:44px;min-height:44px;display:flex;align-items:center;
+  padding:0 9px 0 18px;background:var(--bg);
+  border-bottom:2px solid var(--bd);flex-shrink:0;cursor:move;
+}
+#s-title{
+  font-family:var(--font-display);font-weight:900;
+  font-variation-settings:'wght' 900;
+  font-size:17px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--ac);flex:1;line-height:1;
+}
+#s-close{
+  width:26px;height:26px;display:flex;align-items:center;
+  justify-content:center;border-radius:3px;font-size:14px;
+  color:var(--tx3);cursor:pointer;
+  transition:color var(--tr),background var(--tr);
+}
+#s-close:hover{color:var(--red);background:rgba(224,92,92,.12);}
+
+/* BODY — idéntico a MCopy #s-body */
+#s-body{
+  flex:1;overflow-y:auto;padding:16px 18px;
+  display:flex;flex-direction:column;gap:18px;
+}
+.s-group{display:flex;flex-direction:column;gap:8px;}
+
+/* Section label — idéntico a MCopy .s-glabel */
+.s-glabel{
+  font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ac);display:flex;align-items:center;gap:6px;
+}
+.s-glabel::after{content:'';flex:1;height:1px;background:var(--bd);}
+
+/* Selector row — idéntico a MCopy .s-row / .s-sel */
+.s-row{display:flex;gap:6px;flex-wrap:wrap;}
+.s-sel{
+  flex:1;min-width:72px;padding:7px 10px;text-align:center;
+  font-family:var(--font-display);font-size:11px;font-weight:700;
+  letter-spacing:.03em;text-transform:uppercase;
+  border:2px solid var(--bd);border-radius:var(--r);
+  background:var(--sf2);color:var(--tx2);cursor:pointer;
+  transition:border-color var(--tr),color var(--tr),background var(--tr);
+}
+.s-sel:hover{border-color:var(--bd2);color:var(--tx);background:var(--sf3);}
+.s-sel.active{border-color:var(--ac);color:var(--ac);background:var(--sf2);}
+
+/* Swatches — idéntico a MCopy */
+#accent-swatches{display:flex;flex-wrap:wrap;gap:6px;}
+.swatch{
+  width:22px;height:22px;border-radius:4px;
+  border:2px solid transparent;cursor:pointer;
+  transition:transform var(--tr),border-color var(--tr);flex-shrink:0;
+}
+.swatch:hover{transform:scale(1.15);}
+.swatch.active{border-color:var(--tx);}
+
+/* Hex row — idéntico a MCopy */
+.hex-row{display:flex;gap:7px;align-items:center;}
+#hex-input{
+  flex:1;min-width:0;background:var(--sf2);
+  border:2px solid var(--bd);border-radius:var(--r);
+  color:var(--tx);font-size:12px;font-family:var(--font-body);
+  padding:6px 8px;transition:border-color var(--tr);
+}
+#hex-input:focus{border-color:var(--ac);outline:none;}
+#hex-apply{
+  flex-shrink:0;white-space:nowrap;padding:6px 10px;
+  background:var(--sf3);border:2px solid var(--bd2);border-radius:var(--r);
+  color:var(--tx2);font-family:var(--font-display);font-size:11px;
+  font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;
+  transition:border-color var(--tr),color var(--tr);
+}
+#hex-apply:hover{border-color:var(--ac);color:var(--ac);}
+
+/* FOOTER — idéntico a MCopy #s-footer / #s-save */
+#s-footer{
+  padding:9px 18px;border-top:2px solid var(--bd);
+  display:flex;justify-content:flex-end;flex-shrink:0;
+}
+#s-save{
+  padding:7px 24px;background:var(--ac);color:#000;
+  border:2px solid var(--ac);border-radius:var(--r);
+  font-family:var(--font-display);font-weight:900;
+  font-variation-settings:'wght' 900;
+  font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+  cursor:pointer;transition:filter var(--tr);
+}
+#s-save:hover{filter:brightness(.88);}
+#s-save:active{filter:brightness(.78);}
+</style>
+</head>
+<body>
+
+<div id="s-hdr">
+  <span id="s-title">AJUSTES</span>
+  <span id="s-close">&#10005;</span>
+</div>
+
+<div id="s-body">
+  <div class="s-group">
+    <div class="s-glabel">Tema</div>
+    <div class="s-row">
+      <button class="s-sel" data-theme="mmarket">MMarket</button>
+      <button class="s-sel" data-theme="rosepine">Ros&eacute; Pine</button>
+      <button class="s-sel" data-theme="gruvbox">Gruvbox</button>
+    </div>
+  </div>
+  <div class="s-group">
+    <div class="s-glabel">Acento</div>
+    <div id="accent-swatches"></div>
+    <div class="hex-row">
+      <input type="text" id="hex-input" placeholder="#f5c842" maxlength="7" spellcheck="false">
+      <button id="hex-apply">Aplicar</button>
+    </div>
+  </div>
+  <div class="s-group">
+    <div class="s-glabel">Fuente</div>
+    <div class="s-row">
+      <button class="s-sel" data-font="barlow">Barlow Condensed</button>
+      <button class="s-sel" data-font="monaspace">Monaspace Neon</button>
+    </div>
+  </div>
+  <div class="s-group">
+    <div class="s-glabel">Always on Top</div>
+    <div class="s-row">
+      <button class="s-sel" data-aot="true">On</button>
+      <button class="s-sel" data-aot="false">Off</button>
+    </div>
+  </div>
+  <div class="s-group">
+    <div class="s-glabel">Idioma</div>
+    <div class="s-row">
+      <button class="s-sel" data-lang="es">Espa&ntilde;ol</button>
+      <button class="s-sel" data-lang="en">English</button>
+      <button class="s-sel" data-lang="hi">Hindi</button>
+      <button class="s-sel" data-lang="hg">Hinglish</button>
+    </div>
+  </div>
+</div>
+
+<div id="s-footer">
+  <button id="s-save">GUARDAR</button>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+'use strict';
+
+var backend = null;
+new QWebChannel(qt.webChannelTransport, function(ch) {
+  backend = ch.objects.backend;
+  _init();
+});
+
+function call(m) {
+  var a = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(res, rej) {
+    try { a.push(function(r){res(r);}); backend[m].apply(backend,a); }
+    catch(e){ rej(e); }
+  });
+}
+
+var THEMES = {
+  mmarket: {vars:{'--bg':'#0a0a0a','--sf':'#111111','--sf2':'#181818','--sf3':'#222222','--bd':'#2a2a2a','--bd2':'#3a3a3a','--tx':'#f0f0f0','--tx2':'#888888','--tx3':'#555555','--red':'#e05c5c'},accents:['#f5c842','#5ce07a','#5c9ee0','#e05c5c','#b48ae0','#e08a5c'],def:'#f5c842'},
+  rosepine:{vars:{'--bg':'#191724','--sf':'#1f1d2e','--sf2':'#26233a','--sf3':'#403d52','--bd':'#21202e','--bd2':'#524f67','--tx':'#e0def4','--tx2':'#908caa','--tx3':'#6e6a86','--red':'#eb6f92'},accents:['#f6c177','#eb6f92','#ebbcba','#31748f','#9ccfd8','#c4a7e7'],def:'#f6c177'},
+  gruvbox: {vars:{'--bg':'#1d2021','--sf':'#282828','--sf2':'#3c3836','--sf3':'#504945','--bd':'#45403d','--bd2':'#5a524c','--tx':'#d4be98','--tx2':'#a89984','--tx3':'#928374','--red':'#ea6962'},accents:['#d8a657','#ea6962','#e78a4e','#a9b665','#89b482','#7daea3','#d3869b'],def:'#d8a657'}
+};
+var FONTS = {
+  barlow:   {display:"'Barlow Condensed',Impact,sans-serif", body:"'Segoe UI',system-ui,sans-serif"},
+  monaspace:{display:"'Monaspace Neon',monospace",           body:"'Monaspace Neon',monospace"}
+};
+
+var cfg = {theme:'mmarket',accent:'#f5c842',font:'barlow',lang:'es',always_on_top:true};
+
+function applyThemeVars(th){ var T=THEMES[th];if(!T)return;for(var v in T.vars)document.documentElement.style.setProperty(v,T.vars[v]); }
+function applyAccent(c){ document.documentElement.style.setProperty('--ac',c); }
+function applyFont(f){
+  var F=FONTS[f]||FONTS.barlow;
+  document.documentElement.style.setProperty('--font-display',F.display);
+  document.documentElement.style.setProperty('--font-body',F.body);
+  document.body.style.fontFamily=F.body;
+  document.querySelectorAll('input,button').forEach(function(el){el.style.fontFamily=F.body;});
+}
+function validHex(h){ return /^#[0-9a-fA-F]{6}$/.test(h); }
+
+function syncUI(){
+  document.querySelectorAll('[data-theme]').forEach(function(b){b.classList.toggle('active',b.dataset.theme===cfg.theme);});
+  document.querySelectorAll('[data-font]').forEach(function(b){b.classList.toggle('active',b.dataset.font===cfg.font);});
+  document.querySelectorAll('[data-aot]').forEach(function(b){b.classList.toggle('active',b.dataset.aot===String(cfg.always_on_top));});
+  document.querySelectorAll('[data-lang]').forEach(function(b){b.classList.toggle('active',b.dataset.lang===cfg.lang);});
+  var Th=THEMES[cfg.theme]||THEMES.mmarket, h='';
+  Th.accents.forEach(function(c){
+    var a=c.toLowerCase()===cfg.accent.toLowerCase()?' active':'';
+    h+='<div class="swatch'+a+'" data-color="'+c+'" style="background:'+c+'" title="'+c+'"></div>';
+  });
+  document.getElementById('accent-swatches').innerHTML=h;
+  document.getElementById('hex-input').value=cfg.accent;
+}
+
+/* Drag — mismo patrón que ui.html y MCopy */
+document.getElementById('s-hdr').addEventListener('mousedown',function(e){
+  if(e.button!==0)return;
+  if(backend) backend.start_move();
+});
+
+document.getElementById('s-close').addEventListener('click',function(){if(backend)backend.close_window();});
+
+document.querySelectorAll('[data-theme]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    cfg.theme=this.dataset.theme;
+    var Th=THEMES[cfg.theme]; if(Th){cfg.accent=Th.def;applyAccent(cfg.accent);}
+    applyThemeVars(cfg.theme); syncUI();
+  });
+});
+document.querySelectorAll('[data-font]').forEach(function(btn){
+  btn.addEventListener('click',function(){ cfg.font=this.dataset.font; applyFont(cfg.font); syncUI(); });
+});
+document.querySelectorAll('[data-aot]').forEach(function(btn){
+  btn.addEventListener('click',function(){ cfg.always_on_top=(this.dataset.aot==='true'); syncUI(); });
+});
+document.querySelectorAll('[data-lang]').forEach(function(btn){
+  btn.addEventListener('click',function(){ cfg.lang=this.dataset.lang; syncUI(); });
+});
+document.getElementById('accent-swatches').addEventListener('click',function(e){
+  var sw=e.target.closest('[data-color]'); if(!sw)return;
+  cfg.accent=sw.dataset.color; applyAccent(cfg.accent); syncUI();
+});
+document.getElementById('hex-apply').addEventListener('click',function(){
+  var raw=document.getElementById('hex-input').value.trim();
+  if(!raw.startsWith('#'))raw='#'+raw;
+  if(validHex(raw)){cfg.accent=raw.toLowerCase();applyAccent(cfg.accent);syncUI();}
+});
+document.getElementById('hex-input').addEventListener('keydown',function(e){
+  if(e.key==='Enter')document.getElementById('hex-apply').click();
+});
+document.getElementById('s-save').addEventListener('click',function(){
+  if(backend) backend.save_and_close(JSON.stringify(cfg));
+});
+
+function _init(){
+  call('get_settings').then(function(raw){
+    var s=null; try{s=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){}
+    if(s){
+      if(s.theme&&THEMES[s.theme]) cfg.theme=s.theme;
+      if(s.accent)                 cfg.accent=s.accent;
+      if(s.font&&FONTS[s.font])    cfg.font=s.font;
+      if(s.lang)                   cfg.lang=s.lang;
+      if(s.always_on_top!==undefined) cfg.always_on_top=s.always_on_top;
+    }
+    applyThemeVars(cfg.theme);
+    applyAccent(cfg.accent);
+    applyFont(cfg.font);
+    syncUI();
+  }).catch(function(){ syncUI(); });
+}
+</script>
+</body>
+</html>
