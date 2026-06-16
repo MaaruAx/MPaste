@@ -1,19 +1,23 @@
 """
-MPaste - MMarket Ecosystem
-MMarket/Apps/MPaste/
+main.py — MPaste
+Herramienta de imágenes/GIFs para DaVinci Resolve.
+MMarket Ecosystem
+
+Cambios vs versión anterior:
+  - PySide6 + QWebEngineWidgets (eliminado pywebview)
+  - QWebChannel para API JS↔Python
+  - Guard de instancia única con QLocalServer (enfoca ventana existente)
+  - GIF: inserción en Resolve via scripting (ruta local → ImportMedia)
+  - platform_compat.py para rutas y clipboard cross-platform
+  - Cero dependencias en runtime (todo declarado en install.py / build.bat)
 """
 
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 0 — freeze_support + guard anti-proceso-multiple
-# DEBE ser lo primero absolutamente antes de cualquier import pesado.
-# Razon: PyInstaller --onefile lanza un extractor hijo; sin freeze_support()
-# ese hijo puede reiniciar el entry-point y causar fork-bomb en Windows.
-# ══════════════════════════════════════════════════════════════════════════════
 import sys
 import os
 
-# freeze_support() es un no-op fuera de un .exe empaquetado, pero CRITICO dentro.
-# Debe llamarse antes de cualquier otra cosa cuando el modulo es __main__.
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 0 — freeze_support (DEBE ir antes de cualquier import pesado)
+# ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
@@ -21,39 +25,6 @@ if __name__ == "__main__":
 _IS_FROZEN  = getattr(sys, "frozen", False)
 _BUNDLE_DIR = getattr(sys, "_MEIPASS", None)
 
-# Guard de instancia unica: si ya fue lanzado correctamente, no relanzar.
-_GUARD = "MPASTE_STARTED"
-if os.environ.get(_GUARD) != "1":
-    os.environ[_GUARD] = "1"
-    # Solo aplica cuando se ejecuta como .py (sin empaquetar):
-    # ocultamos la consola relanzando con pythonw.exe.
-    if not _IS_FROZEN:
-        try:
-            import ctypes
-            _hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if _hwnd and _hwnd != 0:
-                _is_store = "WindowsApps" in sys.executable
-                if not _is_store:
-                    _pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-                    if os.path.isfile(_pyw):
-                        import subprocess as _sp
-                        _sp.Popen(
-                            [_pyw] + sys.argv,
-                            creationflags=0x08000000,
-                            close_fds=True,
-                            env={**os.environ, _GUARD: "1"},
-                        )
-                        sys.exit(0)
-                ctypes.windll.user32.ShowWindow(_hwnd, 0)
-        except SystemExit:
-            raise
-        except Exception:
-            pass
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 1 — Rutas base
-# ══════════════════════════════════════════════════════════════════════════════
 if _IS_FROZEN:
     _SCRIPT_DIR = os.path.dirname(sys.executable)
     _BUNDLE_DIR = _BUNDLE_DIR or _SCRIPT_DIR
@@ -61,335 +32,128 @@ else:
     _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     _BUNDLE_DIR = _SCRIPT_DIR
 
-_APPDATA = os.path.expandvars("%APPDATA%")
+# platform_compat debe estar junto a main.py o en _BUNDLE_DIR
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
-INSTALL_DIR   = os.path.join(_APPDATA, "MMarket", "Apps", "MPaste")
-IMAGES_DIR    = os.path.join(INSTALL_DIR, "images")
-CACHE_FILE    = os.path.join(INSTALL_DIR, "deps_cache.json")
-SETTINGS_FILE = os.path.join(INSTALL_DIR, "settings.json")
+import json
+import threading
+import glob
+import tempfile
+import datetime
+import time
+import io
+import platform
+from pathlib import Path
 
-_UI_INSTALLED = os.path.join(INSTALL_DIR, "ui.html")
-_UI_BUNDLE    = os.path.join(_BUNDLE_DIR, "ui.html")
-_UI_LOCAL     = os.path.join(_SCRIPT_DIR, "ui.html")
+from platform_compat import (
+    get_install_dir,
+    get_images_dir,
+    get_resolve_module_paths,
+    clipboard_get_image,
+    clipboard_set_image,
+)
 
-# Carpeta de fuentes: primero en el bundle (exe), luego local
-_FONTS_BUNDLE = os.path.join(_BUNDLE_DIR, "fonts")
-_FONTS_LOCAL  = os.path.join(_SCRIPT_DIR, "fonts")
-FONTS_DIR     = _FONTS_BUNDLE if os.path.isdir(_FONTS_BUNDLE) else _FONTS_LOCAL
+_OS = platform.system()
 
-_RESOLVE_SCRIPTS = [
-    os.path.join(_APPDATA, "Blackmagic Design", "DaVinci Resolve", "Support",
-                 "Fusion", "Scripts", "Utility"),
-    os.path.join(_APPDATA, "Blackmagic Design", "DaVinci Resolve", "Support",
-                 "Fusion", "Scripts", "Edit"),
-    r"C:\ProgramData\Blackmagic Design\DaVinci Resolve\Fusion\Scripts\Utility",
-]
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 1 — Rutas
+# ══════════════════════════════════════════════════════════════════════════════
+INSTALL_DIR   = get_install_dir()
+IMAGES_DIR    = get_images_dir()
+SETTINGS_FILE = INSTALL_DIR / "settings.json"
+
+_UI_BUNDLE = Path(_BUNDLE_DIR) / "ui.html"
+_UI_SCRIPT = Path(_SCRIPT_DIR) / "ui.html"
+_UI_INSTALL = INSTALL_DIR / "ui.html"
 
 for _d in (INSTALL_DIR, IMAGES_DIR):
     try:
-        os.makedirs(_d, exist_ok=True)
+        _d.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
 
-import json
-
-
-def _load_json(path, default):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return dict(default) if isinstance(default, dict) else default
-
-
-def _save_json(path, data):
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        return True
-    except Exception:
-        return False
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 2 — Primer arranque: copia + Lua
-# ══════════════════════════════════════════════════════════════════════════════
-import shutil
-
-_FIRST_RUN_FLAG = os.path.join(INSTALL_DIR, ".initialized")
-
-
-def _do_first_run():
-    if not _IS_FROZEN:
-        for fname in ("main.py", "ui.html"):
-            src = os.path.join(_SCRIPT_DIR, fname)
-            dst = os.path.join(INSTALL_DIR, fname)
-            if os.path.isfile(src) and not os.path.isfile(dst):
-                try:
-                    shutil.copy2(src, dst)
-                except Exception:
-                    pass
-
-    if _IS_FROZEN:
-        exe_path = sys.executable.replace("\\", "\\\\")
-        lua_content = (
-            '-- MPaste launcher para DaVinci Resolve\n'
-            '-- Generado automaticamente por MPaste (MMarket)\n'
-            'local cmd = string.format(\'"' + exe_path + '"\')\n'
-            'os.execute(cmd)\n'
-        )
-    else:
-        pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-        if not os.path.isfile(pyw):
-            pyw = "pythonw"
-        pyw = pyw.replace("\\", "\\\\")
-        main_path = os.path.join(INSTALL_DIR, "main.py").replace("\\", "\\\\")
-        lua_content = (
-            '-- MPaste launcher para DaVinci Resolve\n'
-            '-- Generado automaticamente por MPaste (MMarket)\n'
-            'local cmd = string.format(\'"' + pyw + '" "' + main_path + '"\')\n'
-            'os.execute(cmd)\n'
-        )
-
-    for scripts_dir in _RESOLVE_SCRIPTS:
-        try:
-            os.makedirs(scripts_dir, exist_ok=True)
-            lua_path = os.path.join(scripts_dir, "MPaste.lua")
-            if not os.path.isfile(lua_path):
-                with open(lua_path, "w", encoding="utf-8") as f:
-                    f.write(lua_content)
-            break
-        except Exception:
-            continue
-
-    try:
-        with open(_FIRST_RUN_FLAG, "w") as f:
-            f.write("1")
-    except Exception:
-        pass
-
-
-if not os.path.isfile(_FIRST_RUN_FLAG):
-    _do_first_run()
-else:
-    for fname in ("ui.html",):
-        src = os.path.join(_SCRIPT_DIR, fname)
-        dst = os.path.join(INSTALL_DIR, fname)
-        try:
-            if os.path.isfile(src) and (
-                not os.path.isfile(dst) or
-                os.path.getmtime(src) > os.path.getmtime(dst)
-            ):
-                shutil.copy2(src, dst)
-        except Exception:
-            pass
-
+# Resolver ui.html y settings.html — dev prioriza carpeta de main.py
 if _IS_FROZEN:
-    UI_FILE = _UI_BUNDLE if os.path.isfile(_UI_BUNDLE) else _UI_INSTALLED
+    UI_FILE       = _UI_BUNDLE if _UI_BUNDLE.is_file() else _UI_INSTALL
+    SETTINGS_HTML = Path(_BUNDLE_DIR) / "settings.html"
+    if not SETTINGS_HTML.is_file():
+        SETTINGS_HTML = INSTALL_DIR / "settings.html"
 else:
-    UI_FILE = _UI_INSTALLED if os.path.isfile(_UI_INSTALLED) else _UI_LOCAL
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 3 — Cache de dependencias e instalacion
-# ══════════════════════════════════════════════════════════════════════════════
-import importlib
-import subprocess
-import threading
-
-try:
-    import tkinter as tk
-    from tkinter import ttk, messagebox
-except Exception as e:
-    try:
-        with open(os.path.join(os.path.expandvars("%TEMP%"), "mpaste_error.txt"), "w") as f:
-            f.write(f"tkinter failed: {e}\n")
-    except Exception:
-        pass
-    sys.exit(1)
-
-
-def _show_fatal(msg):
-    try:
-        r = tk.Tk(); r.withdraw()
-        messagebox.showerror("MPaste - Error critico", msg, parent=r)
-        r.destroy()
-    except Exception:
-        pass
-    sys.exit(1)
-
-
-def _is_importable(mod):
-    try:
-        __import__(mod)
-        return True
-    except Exception:
-        return False
-
-
-def _pip_install(pkg):
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", pkg,
-             "--quiet", "--disable-pip-version-check", "--no-warn-script-location"],
-            capture_output=True, text=True, timeout=120,
-        )
-        return result.returncode == 0, result.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return False, "Timeout (120s)"
-    except Exception as ex:
-        return False, str(ex)
-
-
-_REQUIRED = [("Pillow", "PIL"), ("pywebview", "webview"), ("pywin32", "win32clipboard")]
-_OPTIONAL = [("cairosvg", "cairosvg")]
-
-_cache = _load_json(CACHE_FILE, {})
-
-_need_install = []
-for pkg, mod in _REQUIRED:
-    if _cache.get(pkg) == "ok" and _is_importable(mod):
-        continue
-    if not _is_importable(mod):
-        _need_install.append((pkg, mod, False))
-    else:
-        _cache[pkg] = "ok"
-
-for pkg, mod in _OPTIONAL:
-    if _cache.get(pkg) in ("ok", "skip"):
-        continue
-    if not _is_importable(mod):
-        _need_install.append((pkg, mod, True))
-    else:
-        _cache[pkg] = "ok"
-
-_save_json(CACHE_FILE, _cache)
-
-if _need_install:
-    try:
-        _rl = tk.Tk()
-        _rl.title("MPaste")
-        _rl.geometry("290x114")
-        _rl.resizable(False, False)
-        _rl.configure(bg="#0a0a0a")
-        _rl.attributes("-topmost", True)
-        _rl.overrideredirect(True)
-
-        _tb = tk.Frame(_rl, bg="#111111", height=36)
-        _tb.pack(fill="x"); _tb.pack_propagate(False)
-        tk.Label(_tb, text="  MPASTE", bg="#111111", fg="#f5c842",
-                 font=("Impact", 13), anchor="w").pack(side="left", pady=7)
-        tk.Label(_tb, text="Instalando  ", bg="#111111", fg="#333333",
-                 font=("Segoe UI", 7)).pack(side="right", pady=7)
-        tk.Frame(_rl, bg="#2a2a2a", height=2).pack(fill="x")
-
-        _bd = tk.Frame(_rl, bg="#0a0a0a")
-        _bd.pack(fill="both", expand=True, padx=12, pady=10)
-        _lbl = tk.Label(_bd, text="Preparando...", bg="#0a0a0a", fg="#555555",
-                        font=("Segoe UI", 8), anchor="w")
-        _lbl.pack(fill="x")
-
-        _sty = ttk.Style(); _sty.theme_use("default")
-        _sty.configure("M.Horizontal.TProgressbar",
-                       background="#f5c842", troughcolor="#1a1a1a",
-                       bordercolor="#2a2a2a", lightcolor="#f5c842",
-                       darkcolor="#f5c842", thickness=6)
-        _bar = ttk.Progressbar(_bd, style="M.Horizontal.TProgressbar",
-                               length=266, mode="determinate",
-                               maximum=max(len(_need_install), 1))
-        _bar.pack(fill="x", pady=(7, 0))
-
-        def _ds(e): _rl._dx = e.x; _rl._dy = e.y
-        def _dm(e): _rl.geometry(
-            f"+{_rl.winfo_x()+e.x-_rl._dx}+{_rl.winfo_y()+e.y-_rl._dy}")
-        _tb.bind("<ButtonPress-1>", _ds); _tb.bind("<B1-Motion>", _dm)
-
-        _failed = []
-
-        def _worker():
-            nc = dict(_cache)
-            for i, (pkg, mod, opt) in enumerate(_need_install):
-                _rl.after(0, lambda p=pkg, o=opt: _lbl.config(
-                    text=f"Instalando {p}{'  (opcional)' if o else ''}..."
-                ))
-                ok, err = _pip_install(pkg)
-                importlib.invalidate_caches()
-                if ok and _is_importable(mod):
-                    nc[pkg] = "ok"
-                elif opt:
-                    nc[pkg] = "skip"
-                else:
-                    _failed.append((pkg, err))
-                _rl.after(0, lambda v=i+1: _bar.config(value=v))
-            _save_json(CACHE_FILE, nc)
-            _rl.after(300, _rl.destroy)
-
-        _t = threading.Thread(target=_worker, daemon=True)
-        _t.start(); _rl.mainloop(); _t.join()
-        importlib.invalidate_caches()
-
-        if _failed:
-            lines = "\n".join(f"  - {p}: {e or 'desconocido'}" for p, e in _failed)
-            _show_fatal(
-                f"No se pudieron instalar dependencias:\n\n{lines}\n\n"
-                "Soluciones:\n"
-                "  1. CMD como administrador:\n"
-                "       python -m pip install Pillow pywebview pywin32\n"
-                "  2. Verifica tu conexion a internet.\n"
-                "  3. Si usas Python de Microsoft Store,\n"
-                "     instala Python desde python.org."
-            )
-    except Exception as ex:
-        _show_fatal(f"Error durante instalacion:\n{ex}")
-
+    UI_FILE       = _UI_SCRIPT if _UI_SCRIPT.is_file() else _UI_INSTALL
+    SETTINGS_HTML = Path(_SCRIPT_DIR) / "settings.html"
+    if not SETTINGS_HTML.is_file():
+        SETTINGS_HTML = INSTALL_DIR / "settings.html"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 4 — Imports criticos
+# BLOQUE 2 — Resolve modules en sys.path
 # ══════════════════════════════════════════════════════════════════════════════
-try:
-    import webview
-except ImportError:
-    _show_fatal(
-        "pywebview no disponible.\n\n"
-        "Falta Microsoft Edge WebView2 Runtime:\n"
-        "  https://aka.ms/webview2\n\n"
-        "Luego: python -m pip install pywebview"
-    )
-except Exception as ex:
-    _show_fatal(f"Error al cargar pywebview:\n{ex}")
-
-try:
-    from PIL import Image, ImageGrab
-except Exception as ex:
-    _show_fatal(f"Error al cargar Pillow:\n{ex}")
-
-try:
-    import win32clipboard
-except Exception as ex:
-    _show_fatal(f"Error al cargar pywin32:\n{ex}")
-
-_HAS_CAIRO = False
-_cairosvg  = None
-try:
-    import cairosvg as _cairosvg
-    _HAS_CAIRO = True
-except Exception:
-    pass
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 5 — Resolve + helpers
-# ══════════════════════════════════════════════════════════════════════════════
-import glob, tempfile, datetime, time, io
-
-_RESOLVE_MOD_PATHS = [
-    r"C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting\Modules",
-    r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Developer\Scripting\Modules",
-]
-for _rp in _RESOLVE_MOD_PATHS:
+for _rp in get_resolve_module_paths():
+    _rp = str(_rp)
     if os.path.isdir(_rp) and _rp not in sys.path:
         sys.path.insert(0, _rp)
 
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 3 — Settings
+# ══════════════════════════════════════════════════════════════════════════════
+_DEFAULT_SETTINGS = {
+    "accent":        "#f5c842",
+    "theme":         "mmarket",
+    "font":          "barlow",
+    "lang":          "es",
+    "always_on_top": True,
+}
+
+_VALID_THEMES = {"mmarket", "rosepine", "gruvbox"}
+_VALID_FONTS  = {"barlow", "monaspace"}
+_VALID_LANGS  = {"es", "en", "hi", "hg"}
+
+
+def _load_settings() -> dict:
+    try:
+        with SETTINGS_FILE.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        out = dict(_DEFAULT_SETTINGS)
+        for k, v in data.items():
+            if k in _DEFAULT_SETTINGS:
+                out[k] = v
+        return out
+    except Exception:
+        return dict(_DEFAULT_SETTINGS)
+
+
+def _save_settings(data: dict) -> bool:
+    try:
+        import re
+        accent = str(data.get("accent", "#f5c842"))[:20].strip()
+        if not re.match(r'^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$', accent):
+            accent = "#f5c842"
+        theme = str(data.get("theme", "dark"))
+        if theme not in _VALID_THEMES:
+            theme = "dark"
+        lang = str(data.get("lang", "es"))
+        if lang not in _VALID_LANGS:
+            lang = "es"
+        font = str(data.get("font", "barlow"))
+        if font not in _VALID_FONTS:
+            font = "barlow"
+        safe = {
+            "accent":        accent,
+            "theme":         theme,
+            "font":          font,
+            "lang":          lang,
+            "always_on_top": bool(data.get("always_on_top", True)),
+        }
+        with SETTINGS_FILE.open("w", encoding="utf-8") as f:
+            json.dump(safe, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 4 — Helpers de Resolve
+# ══════════════════════════════════════════════════════════════════════════════
 
 def _get_resolve():
     try:
@@ -399,249 +163,203 @@ def _get_resolve():
             "DaVinciResolveScript no encontrado.\n"
             "MPaste requiere DaVinci Resolve Studio."
         )
-    try:
-        resolve = dvr.scriptapp("Resolve")
-    except Exception as e:
-        raise RuntimeError(f"No se pudo conectar a Resolve: {e}")
+    resolve = dvr.scriptapp("Resolve")
     if not resolve:
         raise RuntimeError(
             "DaVinci Resolve no responde.\n"
-            "Asegurate de que este abierto con un proyecto activo."
+            "Asegúrate de que esté abierto con un proyecto activo."
         )
-    try:
-        pm   = resolve.GetProjectManager()
-        proj = pm.GetCurrentProject() if pm else None
-        if not proj:
-            raise RuntimeError("No hay proyecto abierto en Resolve.")
-        return resolve, proj, proj.GetCurrentTimeline()
-    except RuntimeError:
-        raise
-    except Exception as e:
-        raise RuntimeError(f"Error interno de Resolve: {e}")
+    pm   = resolve.GetProjectManager()
+    proj = pm.GetCurrentProject() if pm else None
+    if not proj:
+        raise RuntimeError("No hay proyecto abierto en Resolve.")
+    return resolve, proj, proj.GetCurrentTimeline()
 
 
-def _tc_to_frames(tc_str, fps):
+def _tc_to_frames(tc_str: str, fps: float) -> int:
     try:
         tc = str(tc_str).strip().replace(";", ":")
-        parts = tc.split(":")
-        if len(parts) != 4:
-            return 0
-        h, m, s, f = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+        h, m, s, f = [int(x) for x in tc.split(":")]
         return int(round((h * 3600 + m * 60 + s) * fps)) + f
     except Exception:
         return 0
 
 
-def _playhead_record_frame(tl, fps):
-    try:
-        ph_tc = tl.GetCurrentTimecode()
-        st_tc = tl.GetSetting("startTimecode") or "01:00:00:00"
-        return max(0, _tc_to_frames(ph_tc, fps) - _tc_to_frames(st_tc, fps))
-    except Exception:
-        return 0
-
-
-def _get_still_duration(proj):
-    try:
-        d = proj.GetSetting("stillsDuration")
-        if d:
-            return max(1, int(d))
-    except Exception:
-        pass
-    return 100
-
-
-def _img_to_clipboard(img):
-    buf = io.BytesIO()
-    img.convert("RGB").save(buf, "BMP")
-    dib = buf.getvalue()[14:]
-    win32clipboard.OpenClipboard()
-    try:
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, dib)
-    finally:
-        win32clipboard.CloseClipboard()
-
-
-def _clipboard_to_pil():
-    try:
-        img = ImageGrab.grabclipboard()
-    except Exception:
-        img = None
-
-    if isinstance(img, Image.Image):
-        return img, "bitmap"
-
-    if isinstance(img, list):
-        for path in img:
-            if not isinstance(path, str) or not os.path.isfile(path):
-                continue
-            ext = os.path.splitext(path)[1].lower()
-            if ext == ".svg" and _HAS_CAIRO:
-                try:
-                    return Image.open(io.BytesIO(
-                        _cairosvg.svg2png(url=path)
-                    )).convert("RGBA"), "svg"
-                except Exception:
-                    pass
-            try:
-                return Image.open(path), ext.lstrip(".") or "file"
-            except Exception:
-                continue
-
-    if _HAS_CAIRO:
+def _append_clip(mp, clip) -> bool:
+    """Intenta agregar clip a la timeline con varios métodos de fallback."""
+    for payload in [
+        [clip],
+        [{"mediaPoolItem": clip, "mediaType": 1}],
+        [{"mediaPoolItem": clip, "startFrame": 0, "endFrame": 0, "mediaType": 1}],
+    ]:
         try:
-            win32clipboard.OpenClipboard()
-            try:
-                raw = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
-            finally:
-                win32clipboard.CloseClipboard()
-            if isinstance(raw, str) and raw.strip().startswith("<svg"):
-                return Image.open(io.BytesIO(
-                    _cairosvg.svg2png(bytestring=raw.encode("utf-8"))
-                )).convert("RGBA"), "svg-text"
+            if mp.AppendToTimeline(payload):
+                return True
         except Exception:
-            pass
+            continue
+    return False
 
-    return None, None
 
-
-def _save_image(img):
+def _save_image(img) -> Path | None:
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    for folder in (IMAGES_DIR, tempfile.gettempdir()):
+    for folder in (IMAGES_DIR, Path(tempfile.gettempdir())):
         try:
-            path = os.path.join(folder, f"mpaste_{ts}.png")
-            img.save(path, "PNG")
+            path = folder / f"mpaste_{ts}.png"
+            img.save(str(path), "PNG")
             return path
         except Exception:
             continue
     return None
 
 
-def _append_clip(mp, clip):
-    try:
-        r = mp.AppendToTimeline([clip])
-        if r:
-            return True
-    except Exception:
-        pass
-
-    try:
-        r = mp.AppendToTimeline([{"mediaPoolItem": clip, "mediaType": 1}])
-        if r:
-            return True
-    except Exception:
-        pass
-
-    try:
-        r = mp.AppendToTimeline([{
-            "mediaPoolItem": clip,
-            "startFrame":    0,
-            "endFrame":      0,
-            "mediaType":     1,
-        }])
-        if r:
-            return True
-    except Exception:
-        pass
-
-    return False
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 6 — API para JavaScript
-# ══════════════════════════════════════════════════════════════════════════════
-_DEFAULT_SETTINGS = {
-    "accent":        "#f5c842",
-    "theme":         "dark",
-    "lang":          "es",
-    "always_on_top": True,
-}
-
-
-def _get_fonts_url():
-    """
-    Devuelve la URL base (file:///) de la carpeta fonts/ para usarla en @font-face.
-    Si la carpeta no existe o esta vacia, devuelve None.
-    """
-    if os.path.isdir(FONTS_DIR):
-        entries = [f for f in os.listdir(FONTS_DIR) if f.lower().endswith(".ttf")]
-        if entries:
-            return "file:///" + FONTS_DIR.replace("\\", "/")
+def _save_gif(src_path: Path) -> Path | None:
+    """Copia el GIF a la carpeta de imágenes de MPaste con timestamp."""
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    for folder in (IMAGES_DIR, Path(tempfile.gettempdir())):
+        try:
+            dst = folder / f"mpaste_{ts}.gif"
+            import shutil
+            shutil.copy2(str(src_path), str(dst))
+            return dst
+        except Exception:
+            continue
     return None
 
 
-class API:
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 5 — Backend (QWebChannel API)
+# ══════════════════════════════════════════════════════════════════════════════
+from PySide6.QtCore    import QObject, Slot
+from PySide6.QtWidgets import QApplication
 
-    def get_settings(self):
-        try:
-            s = _load_json(SETTINGS_FILE, _DEFAULT_SETTINGS)
-            for k, v in _DEFAULT_SETTINGS.items():
-                s.setdefault(k, v)
-            return s
-        except Exception:
-            return dict(_DEFAULT_SETTINGS)
 
-    def save_settings(self, data):
-        try:
-            accent = str(data.get("accent", "#f5c842"))[:20].strip()
-            # Validar que sea un hex valido; si no, usar el default
-            import re
-            if not re.match(r'^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$', accent):
-                accent = "#f5c842"
-            safe = {
-                "accent":        accent,
-                "theme":         str(data.get("theme",   "dark"))[:20],
-                "lang":          str(data.get("lang",    "es"))[:10],
-                "always_on_top": bool(data.get("always_on_top", True)),
-            }
-            return _save_json(SETTINGS_FILE, safe)
-        except Exception:
-            return False
+class Backend(QObject):
+    def __init__(self, window):
+        super().__init__()
+        self._win = window
 
-    def get_system_lang(self):
+    # ── Ventana ──────────────────────────────────────────────────────────────
+    @Slot()
+    def start_move(self):
         try:
-            import locale
-            lang = locale.getdefaultlocale()[0] or "en"
-            code = lang.split("_")[0].lower()
-            return code if code in ("es", "en", "hi") else "en"
-        except Exception:
-            return "en"
-
-    def get_fonts_base_url(self):
-        """Expone la URL base de la carpeta fonts/ a JavaScript."""
-        try:
-            return _get_fonts_url()
-        except Exception:
-            return None
-
-    def set_always_on_top(self, value):
-        try:
-            win = webview.windows[0] if webview.windows else None
-            if win:
-                win.on_top = bool(value)
-            s = self.get_settings()
-            s["always_on_top"] = bool(value)
-            _save_json(SETTINGS_FILE, s)
-            return True
-        except Exception:
-            return False
-
-    def minimize(self):
-        try:
-            win = webview.windows[0] if webview.windows else None
-            if win:
-                win.minimize()
+            h = self._win.windowHandle()
+            if h:
+                h.startSystemMove()
         except Exception:
             pass
 
+    @Slot()
+    def minimize_window(self):
+        try:
+            self._win.showMinimized()
+        except Exception:
+            pass
+
+    @Slot()
+    def close_window(self):
+        try:
+            self._win.close()
+        except Exception:
+            pass
+
+    @Slot()
+    def focus_window(self):
+        """Usado por el guard de instancia para enfocar la ventana existente."""
+        try:
+            from PySide6.QtCore import Qt
+            self._win.setWindowState(
+                self._win.windowState() & ~Qt.WindowState.WindowMinimized
+            )
+            self._win.raise_()
+            self._win.activateWindow()
+        except Exception:
+            pass
+
+    # ── Settings ─────────────────────────────────────────────────────────────
+    @Slot(result=str)
+    def get_settings(self):
+        return json.dumps(_load_settings())
+
+    @Slot(str, result=str)
+    def save_settings(self, data_json):
+        try:
+            ok = _save_settings(json.loads(data_json))
+            return json.dumps({"ok": ok})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    @Slot(result=str)
+    def get_system_lang(self):
+        try:
+            import locale
+            loc = locale.getlocale()[0] or locale.getdefaultlocale()[0] or "en"
+            lang = loc.split("_")[0].lower()
+            return lang if lang in _VALID_LANGS else "en"
+        except Exception:
+            return "en"
+
+    @Slot(result=str)
+    def get_fonts_base_url(self):
+        fonts_dir = Path(_BUNDLE_DIR) / "fonts"
+        if not fonts_dir.is_dir():
+            fonts_dir = Path(_SCRIPT_DIR) / "fonts"
+        if fonts_dir.is_dir() and any(fonts_dir.glob("*.ttf")):
+            return "file:///" + str(fonts_dir).replace("\\", "/")
+        return ""
+
+    @Slot(bool, result=str)
+    def set_always_on_top(self, value):
+        try:
+            from PySide6.QtCore import Qt
+            flag = Qt.WindowType.WindowStaysOnTopHint
+            flags = self._win.windowFlags()
+            if value:
+                self._win.setWindowFlags(flags | flag)
+            else:
+                self._win.setWindowFlags(flags & ~flag)
+            self._win.show()
+            s = _load_settings()
+            s["always_on_top"] = bool(value)
+            _save_settings(s)
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    # ── Settings window ──────────────────────────────────────────────────────
+    @Slot()
+    def open_settings(self):
+        """Abre ventana de ajustes (QWebEngineView + settings.html)."""
+        try:
+            from settings_window import SettingsWindow
+            win = self._win
+            # Reutilizar instancia si ya está visible
+            if hasattr(win, '_settings_win') and win._settings_win is not None:
+                sw = win._settings_win
+                if sw.isVisible():
+                    sw.raise_()
+                    sw.activateWindow()
+                    return
+            sw = SettingsWindow(
+                cfg=_load_settings(),
+                settings_html=SETTINGS_HTML,
+                parent=None,
+            )
+            sw.settings_saved.connect(win._on_settings_saved)
+            win._settings_win = sw
+            sw.show_near(win)
+        except Exception:
+            import traceback
+            print("open_settings error:", traceback.format_exc())
+
+    # ── Copy frame (Resolve → clipboard) ─────────────────────────────────────
+    @Slot(result=str)
     def copy_frame(self):
         try:
             resolve, proj, tl = _get_resolve()
         except RuntimeError as e:
-            return {"level": "error", "msg": str(e)}
+            return json.dumps({"level": "error", "msg": str(e)})
         if not tl:
-            return {"level": "warn", "msg": "Sin timeline activa en Resolve"}
+            return json.dumps({"level": "warn", "msg": "Sin timeline activa en Resolve"})
 
         orig_page = "edit"
         try:
@@ -650,8 +368,10 @@ class API:
             pass
 
         def _restore():
-            try: resolve.OpenPage(orig_page)
-            except Exception: pass
+            try:
+                resolve.OpenPage(orig_page)
+            except Exception:
+                pass
 
         try:
             resolve.OpenPage("color")
@@ -671,17 +391,21 @@ class API:
                         if pngs:
                             break
                     if pngs:
+                        from PIL import Image
                         img = Image.open(max(pngs, key=os.path.getmtime)).convert("RGB")
-                        _img_to_clipboard(img)
-                        try: album.DeleteStills([still])
-                        except Exception: pass
+                        clipboard_set_image(img)
+                        try:
+                            album.DeleteStills([still])
+                        except Exception:
+                            pass
                         _restore()
-                        return {"level": "ok", "msg": "Frame copiado al portapapeles"}
+                        return json.dumps({"level": "ok", "msg": "Frame copiado al portapapeles"})
         except Exception:
             pass
 
         _restore()
 
+        # Fallback: imagen estática del clip activo
         try:
             item    = tl.GetCurrentVideoItem()
             mp_item = item.GetMediaPoolItem() if item else None
@@ -689,36 +413,65 @@ class API:
             if fpath and os.path.isfile(fpath):
                 ext = os.path.splitext(fpath)[1].lower()
                 if ext in (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp"):
-                    _img_to_clipboard(Image.open(fpath))
-                    return {"level": "ok", "msg": "Imagen del clip copiada (fallback)"}
+                    from PIL import Image
+                    clipboard_set_image(Image.open(fpath))
+                    return json.dumps({"level": "ok", "msg": "Imagen del clip copiada (fallback)"})
         except Exception:
             pass
 
-        return {"level": "warn", "msg": "Abre pagina Color en Resolve e intenta"}
+        return json.dumps({"level": "warn", "msg": "Abre página Color en Resolve e intenta"})
 
+    # ── Paste image/GIF (clipboard → Resolve) ────────────────────────────────
+    @Slot(result=str)
     def paste_image(self):
+        """
+        Lee el clipboard.
+        - Imagen estática (PNG/JPG/etc.): guarda como PNG → ImportMedia → timeline.
+        - GIF: copia el archivo GIF a IMAGES_DIR → ImportMedia → timeline.
+          DaVinci Resolve soporta GIF nativo; se inserta como clip de video.
+        """
         try:
-            img, fmt = _clipboard_to_pil()
+            img, fmt = clipboard_get_image()
         except Exception as e:
-            return {"level": "error", "msg": f"Error leyendo portapapeles: {e}"}
-        if img is None:
-            return {"level": "warn", "msg": "Portapapeles vacio o sin imagen valida"}
+            return json.dumps({"level": "error", "msg": f"Error leyendo portapapeles: {e}"})
 
+        if img is None:
+            return json.dumps({"level": "warn", "msg": "Portapapeles vacío o sin imagen válida"})
+
+        # ── Caso GIF ──────────────────────────────────────────────────────────
+        if isinstance(fmt, str) and fmt.startswith("gif:"):
+            src_gif = Path(fmt[4:])
+            if not src_gif.is_file():
+                return json.dumps({"level": "error", "msg": f"GIF no encontrado: {src_gif}"})
+
+            saved_path = _save_gif(src_gif)
+            if not saved_path:
+                return json.dumps({"level": "error", "msg": "No se pudo copiar el GIF a disco"})
+
+            return self._import_to_resolve(str(saved_path))
+
+        # ── Caso imagen estática ──────────────────────────────────────────────
         try:
+            from PIL import Image
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGBA")
         except Exception as e:
-            return {"level": "error", "msg": f"No se pudo convertir imagen: {e}"}
+            return json.dumps({"level": "error", "msg": f"No se pudo convertir imagen: {e}"})
 
         saved_path = _save_image(img)
         if not saved_path:
-            return {"level": "error", "msg": "No se pudo guardar la imagen en disco"}
+            return json.dumps({"level": "error", "msg": "No se pudo guardar la imagen en disco"})
 
+        return self._import_to_resolve(str(saved_path))
+
+    def _import_to_resolve(self, file_path: str) -> str:
+        """Importa file_path al MediaPool y lo agrega a la timeline activa."""
         try:
-            resolve, proj, _ = _get_resolve()
+            resolve, proj, tl = _get_resolve()
         except RuntimeError as e:
-            return {"level": "error", "msg": str(e)}
+            return json.dumps({"level": "error", "msg": str(e)})
 
+        # Asegurar página Edit
         try:
             cur = resolve.GetCurrentPage() or ""
             if cur not in ("edit", "cut"):
@@ -727,6 +480,7 @@ class API:
         except Exception:
             pass
 
+        # Refrescar proj/tl por si cambió de página
         try:
             pm   = resolve.GetProjectManager()
             proj = pm.GetCurrentProject()
@@ -736,11 +490,12 @@ class API:
 
         try:
             mp    = proj.GetMediaPool()
-            clips = mp.ImportMedia([saved_path])
+            clips = mp.ImportMedia([file_path])
         except Exception as e:
-            return {"level": "error", "msg": f"ImportMedia fallo: {e}"}
+            return json.dumps({"level": "error", "msg": f"ImportMedia falló: {e}"})
+
         if not clips:
-            return {"level": "error", "msg": "Resolve rechazo el archivo"}
+            return json.dumps({"level": "error", "msg": "Resolve rechazó el archivo"})
 
         bin_name = "Media Pool"
         try:
@@ -749,60 +504,190 @@ class API:
             pass
 
         if not tl:
-            return {"level": "warn", "msg": f"En '{bin_name}' (sin timeline activa)"}
+            return json.dumps({"level": "warn", "msg": f"En '{bin_name}' (sin timeline activa)"})
 
         added = _append_clip(mp, clips[0])
-
         if added:
-            return {"level": "ok",  "msg": f"Pegado en '{bin_name}'"}
-        return {"level": "warn",    "msg": f"En '{bin_name}' (no se pudo agregar a timeline)"}
-
-    def close(self):
-        try:
-            if webview.windows:
-                webview.windows[0].destroy()
-        except Exception:
-            pass
+            return json.dumps({"level": "ok", "msg": f"Pegado en '{bin_name}'"})
+        return json.dumps({"level": "warn", "msg": f"En '{bin_name}' (no se pudo agregar a timeline)"})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BLOQUE 7 — Verificar ui.html y lanzar ventana
+# BLOQUE 6 — Guard de instancia única (QLocalServer)
 # ══════════════════════════════════════════════════════════════════════════════
-if not os.path.isfile(UI_FILE):
-    _show_fatal(
-        f"No se encontro ui.html.\n\n"
-        f"Buscado en:\n"
-        f"  {_BUNDLE_DIR}\n"
-        f"  {INSTALL_DIR}\n"
-        f"  {_SCRIPT_DIR}\n\n"
-        "Si usas el .exe, asegurate de compilarlo con:\n"
-        "  --add-data \"ui.html;.\""
+"""
+Estrategia: QLocalServer con nombre único por usuario.
+
+- Primera instancia: crea el servidor y sigue normal.
+- Segunda instancia: conecta al servidor existente, envía "focus",
+  y sale inmediatamente.
+- Primera instancia recibe "focus" y llama window.focus_window().
+
+Ventajas sobre otras estrategias:
+  ✓ Cross-platform (Win/Mac/Linux) sin syscalls específicos.
+  ✓ No deja archivos de lock huérfanos tras crash (QLocalServer los limpia).
+  ✓ Permite enviar comandos (no solo "ya existe").
+  ✓ No necesita permisos de administrador.
+"""
+
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
+
+_INSTANCE_KEY = "MPaste_MMarket_SingleInstance"
+
+
+def _try_focus_existing() -> bool:
+    """Intenta conectar a una instancia existente. Devuelve True si la encontró."""
+    sock = QLocalSocket()
+    sock.connectToServer(_INSTANCE_KEY)
+    if sock.waitForConnected(500):
+        sock.write(b"focus")
+        sock.flush()
+        sock.waitForBytesWritten(300)
+        sock.disconnectFromServer()
+        return True
+    return False
+
+
+def _start_instance_server(window) -> QLocalServer:
+    """Crea el servidor de instancia única y conecta la señal de foco."""
+    server = QLocalServer()
+    # Limpiar socket anterior si quedó huérfano (crash previo)
+    QLocalServer.removeServer(_INSTANCE_KEY)
+    server.listen(_INSTANCE_KEY)
+
+    def _on_new_connection():
+        conn = server.nextPendingConnection()
+        if not conn:
+            return
+        conn.waitForReadyRead(300)
+        msg = bytes(conn.readAll()).strip()
+        conn.disconnectFromServer()
+        if msg == b"focus":
+            try:
+                from PySide6.QtCore import Qt
+                window.setWindowState(
+                    window.windowState() & ~Qt.WindowState.WindowMinimized
+                )
+                window.raise_()
+                window.activateWindow()
+            except Exception:
+                pass
+
+    server.newConnection.connect(_on_new_connection)
+    return server
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 7 — Ventana principal
+# ══════════════════════════════════════════════════════════════════════════════
+from PySide6.QtWidgets          import QMainWindow
+from PySide6.QtWebEngineWidgets  import QWebEngineView
+from PySide6.QtWebEngineCore     import QWebEngineScript, QWebEngineSettings
+from PySide6.QtWebChannel        import QWebChannel
+from PySide6.QtCore              import Qt, QUrl
+
+
+
+
+class MPasteWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("MPaste")
+        self.setFixedSize(252, 210)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+
+        s = _load_settings()
+        if s.get("always_on_top", True):
+            self.setWindowFlags(
+                self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint
+            )
+
+        self._view = QWebEngineView(self)
+        self.setCentralWidget(self._view)
+
+        self._channel = QWebChannel()
+        self._backend = Backend(self)
+        self._channel.registerObject("backend", self._backend)
+        self._view.page().setWebChannel(self._channel)
+
+        # Aceleración GPU
+        _ws = self._view.page().settings()
+        _ws.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, True)
+        _ws.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+
+        # Inyectar qwebchannel.js
+        script = QWebEngineScript()
+        script.setSourceUrl(QUrl("qrc:/qtwebchannel/qwebchannel.js"))
+        script.setName("mpaste-qwebchannel")
+        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        self._view.page().scripts().insert(script)
+
+        self._settings_win = None  # instancia reutilizable de SettingsWindow
+
+        if UI_FILE.is_file():
+            self._view.setUrl(QUrl.fromLocalFile(str(UI_FILE)))
+        else:
+            self._view.setHtml(
+                "<body style='background:#0a0a0a;color:#e05c5c;"
+                "font-family:monospace;padding:24px'>"
+                f"<h2>ui.html no encontrado</h2><p>{UI_FILE}</p></body>"
+            )
+
+    def _on_settings_saved(self, new_cfg: dict):
+        """Recibe el dict de ajustes desde SettingsWindow y los persiste."""
+        _save_settings(new_cfg)
+        # Propagar always_on_top a la ventana principal inmediatamente
+        aot = bool(new_cfg.get("always_on_top", True))
+        flag = Qt.WindowType.WindowStaysOnTopHint
+        flags = self.windowFlags()
+        if aot:
+            self.setWindowFlags(flags | flag)
+        else:
+            self.setWindowFlags(flags & ~flag)
+        self.show()
+        # Notificar a la WebView para que actualice tema/fuente/idioma sin recargar
+        cfg_json = json.dumps(new_cfg).replace("'", "\'")
+        self._view.page().runJavaScript(
+            f"if(typeof applySettings==='function'){{Object.assign(cfg,{cfg_json});applySettings(false);}}"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BLOQUE 8 — Punto de entrada
+# ══════════════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    # ── CLI flags para Inno Setup ──────────────────────────────────────────
+    # Invocado por el instalador/desinstalador, no abre ventana.
+    if "--install-lua" in sys.argv:
+        from install import install_lua
+        install_lua()
+        sys.exit(0)
+    if "--uninstall-lua" in sys.argv:
+        from install import uninstall_lua
+        uninstall_lua()
+        sys.exit(0)
+
+    os.environ.setdefault(
+        "QTWEBENGINE_CHROMIUM_FLAGS",
+        "--enable-gpu-rasterization --enable-zero-copy "
+        "--ignore-gpu-blocklist --enable-oop-rasterization",
     )
 
-_settings_on_start = _load_json(SETTINGS_FILE, _DEFAULT_SETTINGS)
-_always_on_top     = bool(_settings_on_start.get("always_on_top", True))
+    app = QApplication(sys.argv)
+    app.setApplicationName("MPaste")
+    app.setOrganizationName("MMarket")
+    # AA_UseHighDpiPixmaps eliminado: deprecated en Qt 6, comportamiento por defecto
+    app.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
 
-try:
-    api    = API()
-    ui_url = "file:///" + UI_FILE.replace("\\", "/")
+    # Guard de instancia única: intentar enfocar la existente primero
+    if _try_focus_existing():
+        sys.exit(0)
 
-    webview.create_window(
-        title            = "MPaste",
-        url              = ui_url,
-        js_api           = api,
-        width            = 252,
-        height           = 210,
-        resizable        = False,
-        frameless        = True,
-        on_top           = _always_on_top,
-        background_color = "#0a0a0a",
-        min_size         = (252, 210),
-    )
-    webview.start(debug=False)
-except Exception as e:
-    _show_fatal(
-        f"No se pudo abrir la ventana.\n\nError: {e}\n\n"
-        "Si el error menciona WebView2:\n"
-        "  https://aka.ms/webview2\n\n"
-        "Si usas Python de Microsoft Store, instala Python desde python.org."
-    )
+    window = MPasteWindow()
+    window.show()
+
+    # Iniciar servidor de instancia única DESPUÉS de mostrar la ventana
+    _instance_server = _start_instance_server(window)
+
+    sys.exit(app.exec())
