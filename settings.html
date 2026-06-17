@@ -179,7 +179,6 @@ input,button{font-family:var(--font-body);font-size:12px;}
   <button id="s-save">GUARDAR</button>
 </div>
 
-<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
 'use strict';
 
@@ -236,7 +235,7 @@ function syncUI(){
 
 /* Drag — mismo patrón que ui.html y MCopy */
 document.getElementById('s-hdr').addEventListener('mousedown',function(e){
-  if(e.button!==0)return;
+  if(e.button!==0 || e.target.closest('#s-close')) return;
   if(backend) backend.start_move();
 });
 
