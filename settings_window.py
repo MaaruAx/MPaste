@@ -7,7 +7,7 @@ Mismo renderer, mismas fuentes, mismo look que la ventana principal.
 import json
 from pathlib import Path
 
-from PySide6.QtCore           import Qt, QObject, Slot, Signal
+from PySide6.QtCore           import Qt, QObject, Slot, Signal, QFile, QIODevice
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore  import QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebChannel     import QWebChannel
@@ -80,13 +80,19 @@ class SettingsWindow(QMainWindow):
         self._channel.registerObject("backend", self._backend)
         self._view.page().setWebChannel(self._channel)
 
-        # Inyectar qwebchannel.js
-        script = QWebEngineScript()
-        script.setSourceUrl(QUrl("qrc:/qtwebchannel/qwebchannel.js"))
-        script.setName("settings-qwebchannel")
-        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
-        self._view.page().scripts().insert(script)
+        # Inject qwebchannel.js via setSourceCode (reliable for file:// in Qt 6)
+        f = QFile(":/qtwebchannel/qwebchannel.js")
+        if f.open(QIODevice.OpenModeFlag.ReadOnly):
+            content = bytes(f.readAll()).decode("utf-8")
+            f.close()
+            s = QWebEngineScript()
+            s.setName("settings-qwebchannel")
+            s.setSourceCode(content)
+            s.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            s.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+            self._view.page().scripts().insert(s)
+        else:
+            print("[MPaste] WARNING: qrc:/qtwebchannel/qwebchannel.js not found")
 
         # Cargar HTML
         if self._settings_html.is_file():
